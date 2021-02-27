@@ -33,3 +33,13 @@ class Constants:
     km_to_h = 0.277
     sound_duration = 1000
     sound_freq = 440
+
+class UISelected:
+
+    car_type = 0 # 0 stock, 1 truck 2 bus 3 sport
+    weather = 0 # 0 dry 1 wet 2 snow 3 ice
+    experience = 0 #0 biginner 1 intermediate 2 advanced
+    rec_mode = 0 # 0 smart mode 1 permanent 2 fix-size
+    reaction_time = 0.5
+
+    
