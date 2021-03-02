@@ -2,14 +2,20 @@ from VideoManager import VideoManagerSingleton
 from globals import RecordStorage, record_mode
 import threading
 
-class VideoManagerWrapper():
+
+class VideoManagerWrapper:
+    """
+	Singleton thread safe VideoManager wrapper.
+    Mediates acces between GUI, other threads and low level VideoManager.
+    Use getInstance() method.
+	"""
 
     __instance = None
 
     @staticmethod
     def getInstance():
         if VideoManagerWrapper.__instance is None:
-            VideoManagerWrapper.__instance =  VideoManagerWrapper()
+            VideoManagerWrapper.__instance = VideoManagerWrapper()
         return VideoManagerWrapper.__instance
 
     def __init__(self):
@@ -20,8 +26,7 @@ class VideoManagerWrapper():
         self.permanent = RecordStorage.permanent
         self.fixed = RecordStorage.fix
         self.lock = threading.Lock()
-       
-    
+
     def safe_enter(self):
         self.lock.acquire()
 
@@ -31,17 +36,17 @@ class VideoManagerWrapper():
     def record(self, frame):
         self.safe_enter()
 
-        #if it is suposed to rec
+        # if it is suposed to rec
         if self.global_record is True:
-            #if smart mode is enable
+            # if smart mode is enable
             if self.smart is True:
-                #and objcect is detected close enough
+                # and objcect is detected close enough
                 if self.start_rec is True:
                     self.vm.record(frame, True)
             elif self.permanent is True:
-                    self.vm.record(frame, True)
+                self.vm.record(frame, True)
             elif self.fixed is True:
-                self.vm.record(frame, False)    
+                self.vm.record(frame, False)
         self.safe_exit()
 
     def start(self):
@@ -55,8 +60,8 @@ class VideoManagerWrapper():
         self.safe_exit()
 
     def stop(self):
-        
-        self.safe_enter()                                
+
+        self.safe_enter()
 
         check = False
 
@@ -66,32 +71,32 @@ class VideoManagerWrapper():
 
         self.global_record = False
         RecordStorage.record = False
-        
-        if self.fixed is True:     
+
+        if self.fixed is True:
             check = False
         else:
             check = True
 
-        #start new thread to do the savings    
+        # start a new thread to save the video
         save_thread = threading.Thread(target=self.vm.save, args=(check,))
         save_thread.start()
-        
+
         self.safe_exit()
 
     def start_smart(self):
+
         self.safe_enter()
-        print("Smart mode started")
         self.start_rec = True
         self.safe_exit()
 
     def stop_smart(self):
+
         self.safe_enter()
-        print("Smart mode stopped")
         self.start_rec = False
         self.safe_exit()
 
     def update(self):
-        
+
         self.safe_enter()
 
         self.global_record = RecordStorage.record
@@ -106,4 +111,3 @@ class VideoManagerWrapper():
         # print("record: ", self.global_record)
         # print("start_var rec " , self.start_rec)
         self.safe_exit()
-        

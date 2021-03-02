@@ -5,20 +5,26 @@ Python Intelligent Traffic Assistant
 **DON'T FORGET BACKUP**
 
 - [x] recording modes (smart, permanent, fixed)
-- [ ] recording modes documentation
+- [x] GUI
+- [x] alert system
+- [x] distance measure
+- [ ] allow user to modify fix size time
+- [ ] send informations to firebase
+- [ ] allow video loading 
+- [ ] integrate accelerator
+- [ ] safe app closing
 - [ ] train network
 - [ ] lane detection
-- [x] GUI
 - [ ] GPS module integration
 - [ ] external screen integration
 - [ ] camera calibration
 - [ ] code cleaning
-- [x] alert system
-- [ ] alert system documentation
-- [x] distance measure
-- [ ] distance measure documentation
-- [ ] safe app closing
 - [ ] sources organisation in directories
+
+## Docs:
+- [ ] recording modes documentation
+- [ ] alert system documentation
+- [ ] distance measure documentation
 
 ## Image Detector
 
@@ -81,6 +87,70 @@ The alert system uses the speed recived from GPS and calculates minimum distance
 driver reaction time. 
 
 If the stopping distance is lower than the safety stopping time plus a delay parameter, the driver will be alerted.
+
+## VideoManagerWrapper
+
+VideoManagerWrapper provides a high level, thread safe API for the low level VideoManager.
+
+Mediates acces between GUI, the other classes and VideoManager.
+
+## VideoManager
+
+VideoManager is a singleton class that manages low level recording operations.
+Important parameters in constructor:
+
+#possible to be removed
+* file_name :  represents default file name (it will be overwritted by set_name method)
+* time : represents the maximum seconds that will be recorded 
+* mu : measure unit, represents a measurement unit for *time* parameter; by default time is taken in seconds
+* frame_size : represents image size ( depends by camera )
+* FPS : represents the rate at which the video will be generated
+
+**set_name** : will generate a new file for every start/stop pair
+                File name will be by the form "year|month|day_hour|minutes"
+
+**record** : if it is in fixed mode will record to circular buffer, else will write frame to file
+
+**save** : writes and release the video writer
+
+
+## Recording Modes
+
+PITA offers posibility to work as a smart dash cam.
+Depending on your preferences you can select from three recording modes:
+
+1. Smart Recording
+2. Fixed Sized
+3. Permanent Mode
+
+All of the modes will start after the user press the "Start" button.
+The video will be saved when user stops the recording by pressing "Stop"
+button.
+
+### Smart Recording
+
+Smart recording is the is the recommended recording mode. 
+How does it work? 
+When an object is detected the algorithm aproximates the distance to it.
+When the distance drops under a certain safe distance ( calculated based on the current speed, user experience and reaction time)  the user will be alerted and the app will start to record.
+
+This way, the camera only records when a possible incident is detected.
+Keep in mind that given the network error it might not perform always as expected.
+Thus, if you want to be sure you don't miss any important event it is recommended to use
+one of the other two modes.
+
+## Permanent Recording
+
+Permanent recording captures and stores everything the camera sees after the "Start" button was pressed. It records until the user stops it.
+If you consider long journey, it can consume a lot of memory.
+
+## Fixed Size Recording
+
+Fixed Size Recording combines both of the recording modes.
+It optimisez storage space, but also provides a certain safety that an any
+important event won't be missed.
+User sets the length of the frame time he wants to record.
+The camera will record the last X seconds/minutes (X being the set period).
 
 
 
