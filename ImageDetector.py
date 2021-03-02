@@ -12,7 +12,7 @@ class ImageDetector:
         weights,
         config_file,
         labels="yolo-files/coco.names",
-        average_size="/yolo-files/average_size.csv",
+        average_size="yolo-files/average_size.csv",
         confidence=0.5,
         threshold=0.3,
     ):
@@ -135,6 +135,7 @@ class ImageDetector:
         return boxes, confidences, classIDs, idxs
 
     def get_distance(self, item_id, width, height, focal_length=596):
+        
         mode = int(self.average_size_dictionary[item_id][0])
         value = self.average_size_dictionary[item_id][1]
         denominator = 0
@@ -154,7 +155,7 @@ class ImageDetector:
 
         d = focal_length * float(value) / int(denominator)
 
-        return d
+        return d/100 # convert from m to cm
 
 
 def test():

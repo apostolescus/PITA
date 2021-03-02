@@ -1,7 +1,10 @@
 from CameraManager import CameraManagerSingleton
 from ImageDetector import ImageDetector
+from VideoManager import VideoManagerSingleton
+from VideoManagerWrapper import VideoManagerWrapper
 import cv2
-from threading import Thread
+from globals import RecordStorage, record_mode, stop_program, should_stop
+from threading import *
 from queue import Queue
 from Alerter import Alerter
 from GPS import GPS
@@ -12,9 +15,16 @@ from kivy.uix.screenmanager import ScreenManager, Screen
 from kivy.uix.boxlayout import BoxLayout
 from kivy.graphics.texture import Texture
 from Storage import UISelected
+import logging
+import time
+
 
 check = False
 update = False
+record = False
+stop = False
+videoManager = VideoManagerWrapper.getInstance()
+
 
 # Queues for pipeline
 captured_image_queue = Queue(1)
@@ -33,22 +43,24 @@ class Display(BoxLayout):
 class Screen_One(Screen):
 
     def __init__(self, **kwargs):
+        
         super(Screen_One, self).__init__(**kwargs)
-        self.capture = CameraManagerSingleton().getInstance()
+        self.capture = CameraManagerSingleton.getInstance()
         Clock.schedule_interval(self.update, 1.0 / 30)
 
     def update(self, dt):
-        global captured_image_queue, result_queue
+        global captured_image_queue, result_queue, stop
         
         frame = self.capture.getFrame()
+        #put image in pipeline and send it to video recorder
         try:
             captured_image_queue.put_nowait(frame)
+            videoManager.record(frame)
         except:
             pass
 
         try:  
             img = result_queue.get_nowait()
-
             buf1 = cv2.flip(img, 0)
             buf = buf1.tostring()
             image_texture = Texture.create(
@@ -80,6 +92,7 @@ class Screen_Two(Screen):
     def on_slider_change_value(self, text):
         UISelected.reaction_time = text
 
+    #use this 
     def on_spinner_select_driver_experience(self, text):
 
         temp_var = 0
@@ -113,34 +126,42 @@ class Screen_Two(Screen):
             temp_var = 0
         elif text == "Permanent":
             temp_var = 1
-        else:
+        elif text == "Fix sized":
             temp_var = 2
+        else:
+            temp_var = 3
 
         UISelected.rec_mode = temp_var
 
     def update_settings(self):
         global update
+        print("Updating settings")
         update = True
         
 
 class CameraApp(App):
-
-    global check
 
     def build(self):
         self.title = "PITA"
         return Display()
     
     def start_vid(self):
-        
-        print("Video started")
+       
+       #start video recording
+        videoManager.start()
+
 
     def stop_vid(self):
-        print("Video stopped")
+
+        #save the video
+        videoManager.stop()
 
     def on_stop(self):
-        #without this, app will not exit even if the window is closed
-        self.capture.closeCamera()
+        stop_program()
+        #save the video
+        videoManager.stop()
+        
+        
 
 class GUIManagerThread(Thread):
     def run(self):
@@ -157,10 +178,14 @@ class ImageObjectDetectorThread(Thread):
         imageDetector = ImageDetector("yolo-files/yolov4-tiny.weights", "yolo-files/yolov4-tiny.cfg")
 
         while True:
+            #close app
+            if should_stop() is True:
+                print("Image detector stopping ... ")
+                break
             result = captured_image_queue.get()
             results, distance_dict = imageDetector.detect(result)
             detected_object_queue.put((results, distance_dict))
-
+        print("Image detector stopped")
 # class LaneDetectorThread(Thread):
 #     def run(self):
 #         global second_queue, third_queue
@@ -173,25 +198,42 @@ class ImageObjectDetectorThread(Thread):
 # Analyzes detected object and generates alerts
 # based on speed, current weather, and current speed
 
+#update ReactionTime
 class AlertThread(Thread):
+    
+
     def run(self):
         global third_queue, result_queue, detected_object_queue, update
+        
+        #starts GPS thread
         gps = GPS()
         gps.start()
         
+        self.stop = False
+
         alerter = Alerter()
+
         while True:
-            # results = analyzed_detection_queue.get()
+
+            #clsoe app
+            if should_stop() is True:
+                print("Alerter stopping ...")
+                break
+
             if update is True:
+                videoManager.stop()
                 alerter.update()
+                videoManager.update()
                 update = False
+
             results = detected_object_queue.get()
             distances = results[1]
             
             alerter.check_safety(distances)
 
             result_queue.put(results[0])
-            
+        print("Alerter stopped")
+
 if __name__ == '__main__':
     
    
