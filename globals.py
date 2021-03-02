@@ -25,6 +25,7 @@ def initialize():
 
 def record_mode(mode):
     
+    print("rec mode for: ", mode)
     #0 smart mode + auto start
     if mode == 0:
         RecordStorage.record = False
@@ -55,6 +56,7 @@ def record_mode(mode):
         RecordStorage.save = False
     #print("Record value record_mode: ", RecordStorage.record)
     return True
+
 def start_rec(check = False, start = False, stop = False):
 
     if stop is True:
@@ -84,7 +86,6 @@ def get_speed():
     
 def stop_program():
     global close
-    print("closed modified")
     close = True
 
 def should_stop():

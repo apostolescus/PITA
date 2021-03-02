@@ -42,10 +42,10 @@ class VideoManagerSingleton:
         self.writer = cv2.VideoWriter(out_file,  cv2.VideoWriter_fourcc(*'MJPG'), self.FPS, self.frame_size)
 
     def record(self, frame, long = False):
-        
+        print("entered record")
         if self.buffer is None:
             self.buffer = [frame]*self.buffer_len
-        
+        print("before loing")
         if long is False:
             self.buffer[self.counter] = frame
             self.counter += 1
@@ -55,11 +55,12 @@ class VideoManagerSingleton:
                 self.check = True
 
         else:
+            print("preparing to write")
             self.writer.write(frame)
+            print("wrote frame")
         
 
     def save(self, long = False):
-        
         
         if long is False:
             if self.check is False:

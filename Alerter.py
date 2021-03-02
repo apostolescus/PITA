@@ -26,7 +26,7 @@ class Alerter:
         
     def update(self):
        
-        tmp_var = ''
+        tmp_var = ""
         tmp_weather = ""
 
         if UISelected.car_type == 0:
@@ -58,6 +58,12 @@ class Alerter:
             record_mode(2)
         else:
             record_mode(3)
+
+        # print("permanent: ", RecordStorage.permanent)
+        # print("smart: ", RecordStorage.smart)
+        # print("fixed: ", RecordStorage.fix)
+        # print("record: ", RecordStorage.record)
+        # print("start_var rec " , RecordStorage.start_rec_var)
 
         self.multiply = FrictionCoefficient.formula.multiplier / friction_coef
         self.reaction_time = UISelected.reaction_time * Constants.km_to_h

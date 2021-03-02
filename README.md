@@ -1,6 +1,25 @@
 # PITA
 Python Intelligent Traffic Assistant
 
+## TODO
+**DON'T FORGET BACKUP**
+
+- [x] recording modes (smart, permanent, fixed)
+- [ ] recording modes documentation
+- [ ] train network
+- [ ] lane detection
+- [x] GUI
+- [ ] GPS module integration
+- [ ] external screen integration
+- [ ] camera calibration
+- [ ] code cleaning
+- [x] alert system
+- [ ] alert system documentation
+- [x] distance measure
+- [ ] distance measure documentation
+- [ ] safe app closing
+- [ ] sources organisation in directories
+
 ## Image Detector
 
 This class performs both object detection and distance estimation.

@@ -37,14 +37,11 @@ class VideoManagerWrapper():
             if self.smart is True:
                 #and objcect is detected close enough
                 if self.start_rec is True:
-                    print("smart recording ...")
                     self.vm.record(frame, True)
             elif self.permanent is True:
-                print("permanent recording frame...")
-                self.vm.recod(frame, True)
+                    self.vm.record(frame, True)
             elif self.fixed is True:
                 self.vm.record(frame, False)    
- 
         self.safe_exit()
 
     def start(self):
@@ -54,14 +51,13 @@ class VideoManagerWrapper():
         self.vm.set_name()
 
         RecordStorage.record = True
-        print("Started video recording ...")
 
         self.safe_exit()
 
     def stop(self):
         
         self.safe_enter()                                
-        print("Video manager stopped")
+
         check = False
 
         if self.global_record is False:
@@ -104,5 +100,10 @@ class VideoManagerWrapper():
         self.permanent = RecordStorage.permanent
         self.fixed = RecordStorage.fix
 
+        # print("permanent: ", self.permanent)
+        # print("smart: ", self.smart)
+        # print("fixed: ", self.fixed)
+        # print("record: ", self.global_record)
+        # print("start_var rec " , self.start_rec)
         self.safe_exit()
         
