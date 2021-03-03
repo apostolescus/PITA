@@ -2,29 +2,46 @@
 Python Intelligent Traffic Assistant
 
 ## TODO
-**DON'T FORGET BACKUP**
 
-- [x] recording modes (smart, permanent, fixed)
-- [x] GUI
-- [x] alert system
-- [x] distance measure
-- [ ] allow user to modify fix size time
-- [ ] send informations to firebase
-- [ ] allow video loading 
-- [ ] integrate accelerator
-- [ ] safe app closing
-- [ ] train network
-- [ ] lane detection
-- [ ] GPS module integration
-- [ ] external screen integration
+## **DON'T FORGET BACKUP**
+
+### **Coral TPU:**
+ - [x] test tflite model
+ - [ ] convert yolov4 lite model
+
+### **Lane detection:**
+- [ ] perform basic lane detection
+
+### **GPS:**
+* [x] mocking module
+* [ ] calculate speed
+* [ ] connect gps module
+
+### **Camera:**
+- [x] test with webCam
+- [x] recording modes
+- [x] allow distance measurment
+- [ ] connect GPIO Camera
+- [ ] connect external screen
 - [ ] camera calibration
-- [ ] code cleaning
-- [ ] sources organisation in directories
 
-## Docs:
-- [ ] recording modes documentation
+### **Network:**
+- [ ] label other images
+- [ ] train network
+- [ ] convert network
+
+### **Others:**
+- [x] GUI
+- [x] Alert system
+- [ ] send information to firebase
+- [ ] allow user to modify fix size time
+
+### **Docs:**
+- [x] recording modes documentation
 - [ ] alert system documentation
 - [ ] distance measure documentation
+- [ ] code cleaning
+- [ ] sources organisation in directories
 
 ## Image Detector
 
@@ -139,12 +156,12 @@ Keep in mind that given the network error it might not perform always as expecte
 Thus, if you want to be sure you don't miss any important event it is recommended to use
 one of the other two modes.
 
-## Permanent Recording
+### Permanent Recording
 
 Permanent recording captures and stores everything the camera sees after the "Start" button was pressed. It records until the user stops it.
 If you consider long journey, it can consume a lot of memory.
 
-## Fixed Size Recording
+### Fixed Size Recording
 
 Fixed Size Recording combines both of the recording modes.
 It optimisez storage space, but also provides a certain safety that an any

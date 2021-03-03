@@ -5,17 +5,40 @@ import os
 import csv
 import pandas as pd
 
+from pycoral.adapters.common import input_size
+from pycoral.adapters.detect import get_objects
+from pycoral.utils.dataset import read_label_file
+from pycoral.utils.edgetpu import make_interpreter
+from pycoral.utils.edgetpu import run_inference
 
 class ImageDetector:
     def __init__(
         self,
         weights,
         config_file,
+        model = "yolo",
         labels="yolo-files/coco.names",
         average_size="yolo-files/average_size.csv",
         confidence=0.5,
         threshold=0.3,
     ):
+
+        if model == "yolo":
+            self.mode = 0
+            self.net = cv2.dnn.readNetFromDarknet(config_file, weights)
+            self.layer_names = self.net.getLayerNames()
+            self.layer_names = [
+                self.layer_names[i[0] - 1] for i in self.net.getUnconnectedOutLayers()
+            ]
+            self.labels = open(labels).read().strip().split("\n")
+            
+        elif model == "tflite":
+            self.interpreter = make_interpreter(weights)
+            self.interpreter.allocate_tensors()
+            self.inference_size = input_size(self.interpreter)
+            self.mode = 1
+            self.top_k = 5
+            self.labels = read_label_file(labels)
 
         id_dictionary = {}
         with open(average_size, "r") as data:
@@ -25,37 +48,44 @@ class ImageDetector:
                 id_dictionary[int(element) - 1] = line
 
         self.average_size_dictionary = id_dictionary
-        self.labels = open(labels).read().strip().split("\n")
+       
         self.confidence = confidence
         self.threshold = threshold
         self.average_size = csv.DictReader(average_size)
         self.colors = np.random.randint(
             0, 255, size=(len(self.labels), 3), dtype="uint8"
         )
-        self.net = cv2.dnn.readNetFromDarknet(config_file, weights)
-        self.layer_names = self.net.getLayerNames()
-        self.layer_names = [
-            self.layer_names[i[0] - 1] for i in self.net.getUnconnectedOutLayers()
-        ]
+       
 
-    """
-     YOLO Image Detector. Allows or both object detection and distance to object measurer.
-     In order to measure distance, you should load a file with the WIDTH of each possible object. 
-     The focal length of the sensor is required for correct distance measurement. 
-     The algoritm uses detected object width in pixels and calculates the distance base on true width
-     and focal length: https://www.pyimagesearch.com/2015/01/19/find-distance-camera-objectmarker-using-python-opencv/
+    # """
+    #  YOLO Image Detector. Allows or both object detection and distance to object measurer.
+    #  In order to measure distance, you should load a file with the WIDTH of each possible object. 
+    #  The focal length of the sensor is required for correct distance measurement. 
+    #  The algoritm uses detected object width in pixels and calculates the distance base on true width
+    #  and focal length: https://www.pyimagesearch.com/2015/01/19/find-distance-camera-objectmarker-using-python-opencv/
      
-     Allows distance measurements using width or height.
-    """
+    #  Allows distance measurements using width or height.
+    # """
 
     def detect(self, image):
-        boxes, confidences, classIDs, idxs = self.make_prediction(image)
 
-        image, distances = self.draw_bounding_boxes(
-            image, boxes, confidences, classIDs, idxs
-        )
+        if self.mode == 0: #yolo model
+            boxes, confidences, classIDs, idxs = self.make_prediction(image)
 
-        return image, distances
+            image, distances = self.draw_bounding_boxes(
+                image, boxes, confidences, classIDs, idxs
+            )
+
+            return image, distances
+        else:
+            cv2_im = image
+            cv2_im_rgb = cv2.cvtColor(cv2_im, cv2.COLOR_BGR2RGB)
+            cv2_im_rgb = cv2.resize(cv2_im_rgb, self.inference_size)
+            run_inference(self.interpreter, cv2_im_rgb.tobytes())
+            objs = get_objects(self.interpreter, self.threshold)[:self.top_k]
+            cv2_im, dictionary = self.append_objs_to_img(cv2_im, self.inference_size, objs, self.labels)
+        
+        return cv2_im, dictionary
 
     def extract_boxes_confidences_classids(self, outputs, width, height):
         boxes = []
@@ -84,6 +114,30 @@ class ImageDetector:
                     classIDs.append(classID)
 
         return boxes, confidences, classIDs
+    
+    def append_objs_to_img(self, cv2_im, inference_size, objs, labels):
+
+        height, width, channels = cv2_im.shape
+        scale_x, scale_y = width / inference_size[0], height / inference_size[1]
+        distance_vector = {}
+
+        for obj in objs:
+            bbox = obj.bbox.scale(scale_x, scale_y)
+            x0, y0 = int(bbox.xmin), int(bbox.ymin)
+            x1, y1 = int(bbox.xmax), int(bbox.ymax)
+
+            index = labels.get(obj.id, obj.id)
+            print("index is: ", index)
+            # d = self.get_distance(self.labels.get( obj.id, obj.id))
+            # distance_vector[d] = 
+            percent = int(100 * obj.score)
+            label = '{}% {}'.format(percent, self.labels.get(obj.id, obj.id))
+
+            cv2_im = cv2.rectangle(cv2_im, (x0, y0), (x1, y1), (0, 255, 0), 2)
+            cv2_im = cv2.putText(cv2_im, label, (x0, y0+30),
+                                cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 0, 0), 2)
+
+        return cv2_im, distance_vector
 
     def draw_bounding_boxes(self, image, boxes, confidences, classIDs, idxs):
         """Draws bounding boxes for detected objects.
