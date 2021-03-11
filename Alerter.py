@@ -69,6 +69,8 @@ class Alerter:
         self.reaction_time = UISelected.reaction_time * Constants.km_to_h
         self.recording_mode = UISelected.rec_mode
 
+    
+
     def check_safety(self, distances):
         
         safe = True

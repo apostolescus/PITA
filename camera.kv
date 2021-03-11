@@ -118,7 +118,12 @@
         	spacing: 10
         	orientation : 'horizontal'
         	
-
+            Label:
+                text:'Lane detection'
+                font_size: 15
+            Switch:
+                id: switch
+                on_active: app.switch_callback()
 	        Button:
 	            text: 'Start'
 	            background_normal: ''

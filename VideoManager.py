@@ -7,14 +7,14 @@ from datetime import datetime
 
 class VideoManagerSingleton:
 
-	"""
-	Singleton class manages low level image operations.
-	Used with a wrapper above.
-	time : by default 180 secs
-	mu : False if time is in seconds, else True
-	frame_size : modify depending on the camera
-	FPS : modify depending on the frame size you obtain after camera processing 
-	"""
+	# '''
+	# Singleton class manages low level image operations.
+	# Used with a wrapper above.
+	# time : by default 180 secs
+	# mu : False if time is in seconds, else True
+	# frame_size : modify depending on the camera
+	# FPS : modify depending on the frame size you obtain after camera processing 
+	# '''
 
     __instance = None
 

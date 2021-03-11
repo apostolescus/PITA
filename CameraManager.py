@@ -8,13 +8,16 @@ class CameraManagerSingleton:
     _lock = Lock()
     __instance = None
     @staticmethod
-    def getInstance():
+    def getInstance(mode, path="project_video.mp4"):
         if CameraManagerSingleton.__instance == None:
-            CameraManagerSingleton()
+            CameraManagerSingleton(mode, path)
         return CameraManagerSingleton.__instance
     
-    def __init__(self):
-        self.camera = cv2.VideoCapture(0)
+    def __init__(self, mode, path):
+        if mode == "1":
+            self.camera = cv2.VideoCapture(0)
+        else:
+            self.camera = cv2.VideoCapture(path)
         CameraManagerSingleton.__instance = self
 
     def getFrame(self):

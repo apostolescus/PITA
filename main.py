@@ -3,9 +3,11 @@ from ImageDetector import ImageDetector
 from VideoManager import VideoManagerSingleton
 from VideoManagerWrapper import VideoManagerWrapper
 import cv2
-from globals import RecordStorage, record_mode, stop_program, should_stop
+import line_fit
+from LaneDetector import LaneDetector
+from globals import RecordStorage, record_mode, stop_program, should_stop, StoppableThread
 from threading import *
-from queue import Queue
+from queue import Queue, Empty
 from Alerter import Alerter
 from GPS import GPS
 from kivy.app import App
@@ -16,15 +18,18 @@ from kivy.uix.boxlayout import BoxLayout
 from kivy.graphics.texture import Texture
 from Storage import UISelected
 import logging
+import sys
 import time
 
-
+switch = False
 check = False
 update = False
 record = False
 stop = False
+lane = False
 videoManager = VideoManagerWrapper.getInstance()
 
+mode = 0
 
 # Queues for pipeline
 captured_image_queue = Queue(1)
@@ -35,6 +40,21 @@ result_queue = Queue(1)
 # Thread wrappering for CameraManager.
 # Captures frames from camera, sends them in pipeline
 # and displays the result.
+
+class PropertiesStorage():
+
+    def __init__(self, image):
+        self.image = image
+    
+    def add_detected_prop(self, bbx_prop):
+        if not bbx_prop:
+            self.bbx_prop = None
+        else:
+            self.bbx_prop = bbx_prop
+
+    def add_lines(self, lines_prop):
+        self.lines_prop = lines_prop
+
 class Display(BoxLayout):
 
     def __init__(self, **kwargs):
@@ -45,7 +65,7 @@ class Screen_One(Screen):
     def __init__(self, **kwargs):
         
         super(Screen_One, self).__init__(**kwargs)
-        self.capture = CameraManagerSingleton.getInstance()
+        self.capture = CameraManagerSingleton.getInstance(mode)
         Clock.schedule_interval(self.update, 1.0 / 30)
 
     def update(self, dt):
@@ -70,7 +90,6 @@ class Screen_One(Screen):
             self.ids.imageView.texture = image_texture
         except:
             pass
-
 
 class Screen_Two(Screen):
    
@@ -136,8 +155,7 @@ class Screen_Two(Screen):
     def update_settings(self):
         global update
         print("Updating settings")
-        update = True
-        
+        update = True    
 
 class CameraApp(App):
 
@@ -150,20 +168,31 @@ class CameraApp(App):
        #start video recording
         videoManager.start()
 
-
     def stop_vid(self):
 
         #save the video
         videoManager.stop()
 
     def on_stop(self):
-        stop_program()
-        #save the video
         videoManager.stop()
-        
-        
 
-class GUIManagerThread(Thread):
+        for thread in enumerate():
+            if thread.name != "MainThread" and thread.name != "guiThread":
+                thread.join()
+      
+        
+    def switch_callback(self):
+        global switch
+
+        #lane_detector = LaneDetectorThread()
+        print("Switch value: ", switch)
+        if switch is False:
+            switch = True
+            #lane_detector.start()
+        else:
+            switch = False
+
+class GUIManagerThread(StoppableThread):
     def run(self):
         gui = CameraApp()
         gui.run()
@@ -172,77 +201,96 @@ class GUIManagerThread(Thread):
 # Performs image objct detection and measures
 # distance to detected object.
 
-class ImageObjectDetectorThread(Thread):
+class ImageObjectDetectorThread(StoppableThread):
+    
+
     def run(self):
         global captured_image_queue, second_queue
+        
         imageDetector = ImageDetector("yolo-files/yolov4-tiny.weights", "yolo-files/yolov4-tiny.cfg")
+        
+        #imageDetector = ImageDetector("yolo-files/mobilenet_ssd_v2_coco_quant_postprocess_edgetpu.tflite", "yolo-files/yolov4-tiny.cfg", model = "tflite")
 
-        while True:
+        while not self.stopevent.isSet():
             #close app
-            if should_stop() is True:
-                print("Image detector stopping ... ")
-                break
-            result = captured_image_queue.get()
-            results, distance_dict = imageDetector.detect(result)
-            detected_object_queue.put((results, distance_dict))
-        print("Image detector stopped")
-# class LaneDetectorThread(Thread):
-#     def run(self):
-#         global second_queue, third_queue
+           
+            read_image = captured_image_queue.get()
+            bbx_details = imageDetector.detect(read_image)
+            detected_object_queue.put((read_image, bbx_details))
 
-#         while True:
-#             results = detected_object_queue.get()
-#             analyzed_detection_queue.put(results)
+        print("Image detector stopped")
+
+
+class LaneDetectorThread(StoppableThread):
+    def run(self):
+
+        #lane_detector = LaneDetector("calibrate_camera.p")
+
+        while not self.stopevent.isSet():
+
+            try:
+                proprStorage = detected_object_queue.get_nowait()
+                #print("Read and putted lane detector")
+                # detected_lines = lane_detector.detect_lane(proprStorage.image)
+                # proprStorage.add_lines(detected_lines)
+                analyzed_detection_queue.put(proprStorage)
+            except:
+                continue
 
 # Thread wrapper for Alert.
 # Analyzes detected object and generates alerts
 # based on speed, current weather, and current speed
 
 #update ReactionTime
-class AlertThread(Thread):
+class AlertThread(StoppableThread):
     
-
     def run(self):
         global third_queue, result_queue, detected_object_queue, update
         
         #starts GPS thread
-        gps = GPS()
+        gps = GPS("GPSThread")
         gps.start()
         
         self.stop = False
 
         alerter = Alerter()
 
-        while True:
-
-            #clsoe app
-            if should_stop() is True:
-                print("Alerter stopping ...")
-                break
+        while not self.stopevent.isSet():
 
             if update is True:
                 videoManager.stop()
                 alerter.update()
                 videoManager.update()
                 update = False
+            try:
+                res = analyzed_detection_queue.get_nowait()
 
-            results = detected_object_queue.get()
-            distances = results[1]
+                if len(res[1]) != 0:
+                    alerter.check_safety(res[1][6])
+              
+                final = line_fit.final_viz(res[0], res[1])
+               
+                result_queue.put(final)
+            except:
+                continue
             
-            alerter.check_safety(distances)
-
-            result_queue.put(results[0])
         print("Alerter stopped")
 
 if __name__ == '__main__':
     
-   
+    imageDetector = ImageObjectDetectorThread("imageDetector")
+    guiManager= GUIManagerThread("guiThread")
+    alerter = AlertThread("AlerterThread")
+    lane = LaneDetectorThread("laneThread")
 
-    # if __name__ == '__main__':
-    GUIManagerThread().start()
-    ImageObjectDetectorThread().start()
+    lane.start()
+    imageDetector.start()
+    guiManager.start()
+    alerter.start()
+
+
     #LaneDetectorThread().start()
     
-    alerter = AlertThread()
-    alerter.setName("alerter")
-    alerter.start()
+    
+    
+    

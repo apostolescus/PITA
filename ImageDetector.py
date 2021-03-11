@@ -66,26 +66,42 @@ class ImageDetector:
      
     #  Allows distance measurements using width or height.
     # """
+    def __get_distances(self, boxes, confidences, classIDs, idxs):
+        distance_vector = {}
 
+        if len(idxs) > 0:
+            for i in idxs.flatten():
+                x, y = boxes[i][0], boxes[i][1]
+                w, h = boxes[i][2], boxes[i][3]
+
+                d = self.get_distance(classIDs[i], w, h)
+                distance_vector[d] = classIDs[i]
+
+        return distance_vector
+    
     def detect(self, image):
 
-        if self.mode == 0: #yolo model
+        if self.mode == 0: #yolo modeld
             boxes, confidences, classIDs, idxs = self.make_prediction(image)
 
-            image, distances = self.draw_bounding_boxes(
-                image, boxes, confidences, classIDs, idxs
-            )
+            if len(idxs) > 0:
+                distances = self.__get_distances(boxes, confidences, classIDs, idxs)
+                draw_box_parameters = (boxes, confidences, classIDs, idxs, self.labels, self.colors, distances)
+                
+            else:
+                draw_box_parameters = ()
 
-            return image, distances
-        else:
-            cv2_im = image
-            cv2_im_rgb = cv2.cvtColor(cv2_im, cv2.COLOR_BGR2RGB)
-            cv2_im_rgb = cv2.resize(cv2_im_rgb, self.inference_size)
-            run_inference(self.interpreter, cv2_im_rgb.tobytes())
-            objs = get_objects(self.interpreter, self.threshold)[:self.top_k]
-            cv2_im, dictionary = self.append_objs_to_img(cv2_im, self.inference_size, objs, self.labels)
+            return draw_box_parameters
+
+        # else:
+        #     cv2_im = image
+        #     cv2_im_rgb = cv2.cvtColor(cv2_im, cv2.COLOR_BGR2RGB)
+        #     cv2_im_rgb = cv2.resize(cv2_im_rgb, self.inference_size)
+        #     run_inference(self.interpreter, cv2_im_rgb.tobytes())
+        #     objs = get_objects(self.interpreter, self.threshold)[:self.top_k]
+        #     cv2_im, dictionary = self.append_objs_to_img(cv2_im, self.inference_size, objs, self.labels)
         
-        return cv2_im, dictionary
+        # return cv2_im, dictionary
 
     def extract_boxes_confidences_classids(self, outputs, width, height):
         boxes = []
@@ -127,9 +143,7 @@ class ImageDetector:
             x1, y1 = int(bbox.xmax), int(bbox.ymax)
 
             index = labels.get(obj.id, obj.id)
-            print("index is: ", index)
-            # d = self.get_distance(self.labels.get( obj.id, obj.id))
-            # distance_vector[d] = 
+
             percent = int(100 * obj.score)
             label = '{}% {}'.format(percent, self.labels.get(obj.id, obj.id))
 
@@ -139,33 +153,33 @@ class ImageDetector:
 
         return cv2_im, distance_vector
 
-    def draw_bounding_boxes(self, image, boxes, confidences, classIDs, idxs):
-        """Draws bounding boxes for detected objects.
+    # def draw_bounding_boxes(self, image, boxes, confidences, classIDs, idxs):
+    #     """Draws bounding boxes for detected objects.
 
-        Allows for both width or heigh distance measurements.
-        """
+    #     Allows for both width or heigh distance measurements.
+    #     """
+    #     distance_vector = {}
+       
 
-        distance_vector = {}
+    #     if len(idxs) > 0:
+    #         for i in idxs.flatten():
 
-        if len(idxs) > 0:
-            for i in idxs.flatten():
+    #             x, y = boxes[i][0], boxes[i][1]
+    #             w, h = boxes[i][2], boxes[i][3]
 
-                x, y = boxes[i][0], boxes[i][1]
-                w, h = boxes[i][2], boxes[i][3]
+    #             d = self.get_distance(classIDs[i], w, h)
+    #             distance_vector[d] = classIDs[i]
 
-                d = self.get_distance(classIDs[i], w, h)
-                distance_vector[d] = classIDs[i]
+    #             color = [int(c) for c in self.colors[classIDs[i]]]
+    #             cv2.rectangle(image, (x, y), (x + w, y + h), color, 2)
+    #             text = "{}: {:.4f}: {:.2f}".format(
+    #                 self.labels[classIDs[i]], confidences[i], d
+    #             )
+    #             cv2.putText(
+    #                 image, text, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2
+    #             )
 
-                color = [int(c) for c in self.colors[classIDs[i]]]
-                cv2.rectangle(image, (x, y), (x + w, y + h), color, 2)
-                text = "{}: {:.4f}: {:.2f}".format(
-                    self.labels[classIDs[i]], confidences[i], d
-                )
-                cv2.putText(
-                    image, text, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2
-                )
-
-        return image, distance_vector
+    #     return image, distance_vector
 
     def make_prediction(self, image):
 

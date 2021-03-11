@@ -1,9 +1,18 @@
-from threading import Lock
+from threading import Lock, Thread, Event
 import copy
 import logging
 
 lock = Lock()
 close = False
+
+class StoppableThread(Thread):
+    def __init__(self, name):
+        self.stopevent = Event()
+        Thread.__init__(self, name=name)
+
+    def join(self):
+        self.stopevent.set()
+        Thread.join(self)
 
 class RecordStorage:
     permanent = False
