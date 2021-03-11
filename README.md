@@ -10,7 +10,11 @@ Python Intelligent Traffic Assistant
  - [ ] convert yolov4 lite model
 
 ### **Lane detection:**
-- [ ] perform basic lane detection
+- [x] add lane detector to pipeline
+- [x] perform basic lane detection
+- [x] add switch to GUI 
+- [ ] document improvements
+- [ ] compare to robust lane detection
 
 ### **GPS:**
 * [x] mocking module
@@ -23,7 +27,6 @@ Python Intelligent Traffic Assistant
 - [x] allow distance measurment
 - [ ] connect GPIO Camera
 - [ ] connect external screen
-- [ ] camera calibration
 
 ### **Network:**
 - [ ] label other images

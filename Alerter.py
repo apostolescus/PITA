@@ -4,6 +4,7 @@ from VideoManager import VideoManagerSingleton
 from VideoManagerWrapper import VideoManagerWrapper
 from globals import RecordStorage, start_rec
 import logging
+import cv2
 
 class Alerter:
     def __init__(
@@ -70,6 +71,30 @@ class Alerter:
         self.recording_mode = UISelected.rec_mode
 
     
+    def draw_image(self, image, detected_bbx, lines=None):
+
+        if len(detected_bbx) != 0 :
+            boxes = detected_bbx[0]
+            confidences = detected_bbx[1]
+            classIDs = detected_bbx[2]
+            idxs = detected_bbx[3]
+            labels = detected_bbx[4]
+            colors = detected_bbx[5]
+            #distances = detected_bbx[6]
+
+            for i in idxs.flatten():
+
+                x, y = boxes[i][0], boxes[i][1]
+                w, h = boxes[i][2], boxes[i][3]
+
+                color = [int(c) for c in colors[classIDs[i]]]
+                cv2.rectangle(image, (x, y), (x + w, y + h), color, 2)
+                text = "{}: {:.4f}".format(labels[classIDs[i]], confidences[i])
+
+                cv2.putText(image, text, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+        if lines is not None:
+            image = cv2.addWeighted(image, 1, lines, 0.5,1)
+        return image
 
     def check_safety(self, distances):
         

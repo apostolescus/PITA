@@ -3,7 +3,6 @@ from ImageDetector import ImageDetector
 from VideoManager import VideoManagerSingleton
 from VideoManagerWrapper import VideoManagerWrapper
 import cv2
-import line_fit
 from LaneDetector import LaneDetector
 from globals import RecordStorage, record_mode, stop_program, should_stop, StoppableThread
 from threading import *
@@ -26,7 +25,6 @@ check = False
 update = False
 record = False
 stop = False
-lane = False
 videoManager = VideoManagerWrapper.getInstance()
 
 mode = 0
@@ -40,20 +38,6 @@ result_queue = Queue(1)
 # Thread wrappering for CameraManager.
 # Captures frames from camera, sends them in pipeline
 # and displays the result.
-
-class PropertiesStorage():
-
-    def __init__(self, image):
-        self.image = image
-    
-    def add_detected_prop(self, bbx_prop):
-        if not bbx_prop:
-            self.bbx_prop = None
-        else:
-            self.bbx_prop = bbx_prop
-
-    def add_lines(self, lines_prop):
-        self.lines_prop = lines_prop
 
 class Display(BoxLayout):
 
@@ -182,14 +166,18 @@ class CameraApp(App):
       
         
     def switch_callback(self):
-        global switch
+        global switch, lane_detector
 
-        #lane_detector = LaneDetectorThread()
-        print("Switch value: ", switch)
+        # print("Switch value: ", switch)
         if switch is False:
+            lane_detector = LaneDetectorThread("lane_thread")
             switch = True
-            #lane_detector.start()
+            lane_detector.start()
         else:
+            for thread in enumerate():
+                if thread.name == "lane_thread":
+                    thread.join()
+            #lane_detector.join()
             switch = False
 
 class GUIManagerThread(StoppableThread):
@@ -205,7 +193,7 @@ class ImageObjectDetectorThread(StoppableThread):
     
 
     def run(self):
-        global captured_image_queue, second_queue
+        global captured_image_queue
         
         imageDetector = ImageDetector("yolo-files/yolov4-tiny.weights", "yolo-files/yolov4-tiny.cfg")
         
@@ -216,7 +204,10 @@ class ImageObjectDetectorThread(StoppableThread):
            
             read_image = captured_image_queue.get()
             bbx_details = imageDetector.detect(read_image)
-            detected_object_queue.put((read_image, bbx_details))
+            if switch is False:
+                analyzed_detection_queue.put([read_image, bbx_details])
+            else:
+                detected_object_queue.put([read_image, bbx_details])
 
         print("Image detector stopped")
 
@@ -224,15 +215,20 @@ class ImageObjectDetectorThread(StoppableThread):
 class LaneDetectorThread(StoppableThread):
     def run(self):
 
+        lane_detector = LaneDetector()
         #lane_detector = LaneDetector("calibrate_camera.p")
 
         while not self.stopevent.isSet():
 
             try:
-                proprStorage = detected_object_queue.get_nowait()
-                #print("Read and putted lane detector")
-                # detected_lines = lane_detector.detect_lane(proprStorage.image)
-                # proprStorage.add_lines(detected_lines)
+                proprStorage = detected_object_queue.get()
+                image = proprStorage[0]
+               
+                lines = lane_detector.detect_lane(image)
+
+                if lines is not None:
+                    proprStorage.append(lines)
+            
                 analyzed_detection_queue.put(proprStorage)
             except:
                 continue
@@ -262,17 +258,18 @@ class AlertThread(StoppableThread):
                 alerter.update()
                 videoManager.update()
                 update = False
-            try:
-                res = analyzed_detection_queue.get_nowait()
+            
+            res = analyzed_detection_queue.get()
+           
+            if len(res[1]) != 0:
+                alerter.check_safety(res[1][6])
+            if len(res) == 3:
+                lines = res[2]
+            else:
+                lines = None
+            drawn_image = alerter.draw_image(res[0], res[1], lines)
+            result_queue.put(drawn_image)
 
-                if len(res[1]) != 0:
-                    alerter.check_safety(res[1][6])
-              
-                final = line_fit.final_viz(res[0], res[1])
-               
-                result_queue.put(final)
-            except:
-                continue
             
         print("Alerter stopped")
 
@@ -281,9 +278,9 @@ if __name__ == '__main__':
     imageDetector = ImageObjectDetectorThread("imageDetector")
     guiManager= GUIManagerThread("guiThread")
     alerter = AlertThread("AlerterThread")
-    lane = LaneDetectorThread("laneThread")
+    #lane = LaneDetectorThread("laneThread")
 
-    lane.start()
+    #lane.start()
     imageDetector.start()
     guiManager.start()
     alerter.start()

@@ -8,7 +8,7 @@ class CameraManagerSingleton:
     _lock = Lock()
     __instance = None
     @staticmethod
-    def getInstance(mode, path="project_video.mp4"):
+    def getInstance(mode, path="good.mp4"):
         if CameraManagerSingleton.__instance == None:
             CameraManagerSingleton(mode, path)
         return CameraManagerSingleton.__instance
