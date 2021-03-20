@@ -37,6 +37,12 @@ Python Intelligent Traffic Assistant
 - [ ] train network
 - [ ] convert network
 
+### **Alerter: **
+- [x] alert only for vehicles on the same 
+lane
+- [x] add connection to Firebase
+- [ ] send data to firebase when danger
+
 ### **Others:**
 - [x] GUI
 - [x] Alert system

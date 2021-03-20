@@ -4,12 +4,13 @@ import cv2
 import os
 import csv
 import pandas as pd
-
+from shapely.geometry import Polygon
 from pycoral.adapters.common import input_size
 from pycoral.adapters.detect import get_objects
 from pycoral.utils.dataset import read_label_file
 from pycoral.utils.edgetpu import make_interpreter
 from pycoral.utils.edgetpu import run_inference
+import uuid
 
 class ImageDetector:
     def __init__(
@@ -66,27 +67,64 @@ class ImageDetector:
      
     #  Allows distance measurements using width or height.
     # """
-    def __get_distances(self, boxes, confidences, classIDs, idxs):
+
+
+    def __get_distances(self, boxes, confidences, classIDs, idxs, height, uniqueIDs, width):
+    # """ Calculates distances and checks if vehicles in front"""
+
+        #Done:
+        #check distance only for cars in front 
+
+        #TO DO:
+        #improve for semapthore distance estimation
+        #extend range for pedestrians
+
         distance_vector = {}
+        object_position = {}
+        
+        #polygon used for lane detection
+        p1 = Polygon([(340, 150), (920, height - 550), (1570, 150)])
+
 
         if len(idxs) > 0:
             for i in idxs.flatten():
                 x, y = boxes[i][0], boxes[i][1]
                 w, h = boxes[i][2], boxes[i][3]
 
-                d = self.get_distance(classIDs[i], w, h)
-                distance_vector[d] = classIDs[i]
+                #calculate overlap area
+                car_area = w*h
+                car_area_min_val = 80/100*car_area
+                y_cart = height - y - h
 
-        return distance_vector
+                p2 = Polygon([(x, y_cart), (x+w, y_cart), (x+w, y_cart+h), (x, y_cart+h)])
+                
+                # if the car is in front and it is over 80% inside the riding view
+                # calculate distance and add as possible danger
+
+                intersection = p2.intersects(p1)
+
+                if intersection:
+                    intersection_area = p2.intersection(p1).area
+
+                    if intersection_area >= car_area_min_val:
+                        print("more than 80% in the interesting zone")
+                        d = self.get_distance(classIDs[i], w, h)
+                        distance_vector[d] = classIDs[i]
+                        id = uniqueIDs[i]
+                        object_position[id] = 0
+
+        return distance_vector, object_position
     
     def detect(self, image):
 
+        height, width, ch = image.shape
+
         if self.mode == 0: #yolo modeld
-            boxes, confidences, classIDs, idxs = self.make_prediction(image)
+            boxes, confidences, classIDs, idxs, uniqueIDs = self.make_prediction(image)
 
             if len(idxs) > 0:
-                distances = self.__get_distances(boxes, confidences, classIDs, idxs)
-                draw_box_parameters = (boxes, confidences, classIDs, idxs, self.labels, self.colors, distances)
+                distances, frontal_list = self.__get_distances(boxes, confidences, classIDs, idxs, height, uniqueIDs, width)
+                draw_box_parameters = (boxes, confidences, classIDs, idxs, self.labels, self.colors, distances, uniqueIDs, frontal_list)
                 
             else:
                 draw_box_parameters = ()
@@ -107,6 +145,7 @@ class ImageDetector:
         boxes = []
         confidences = []
         classIDs = []
+        unique_id = []
 
         for output in outputs:
             for detection in output:
@@ -128,8 +167,9 @@ class ImageDetector:
                     boxes.append([x, y, int(w), int(h)])
                     confidences.append(float(conf))
                     classIDs.append(classID)
+                    unique_id.append(uuid.uuid4())
 
-        return boxes, confidences, classIDs
+        return boxes, confidences, classIDs, unique_id
     
     def append_objs_to_img(self, cv2_im, inference_size, objs, labels):
 
@@ -193,14 +233,14 @@ class ImageDetector:
         outputs = self.net.forward(self.layer_names)
 
         # Extract bounding boxes, confidences and classIDs
-        boxes, confidences, classIDs = self.extract_boxes_confidences_classids(
+        boxes, confidences, classIDs, uniqueIDs = self.extract_boxes_confidences_classids(
             outputs, width, height
         )
 
         # Apply Non-Max Suppression
         idxs = cv2.dnn.NMSBoxes(boxes, confidences, self.confidence, self.threshold)
 
-        return boxes, confidences, classIDs, idxs
+        return boxes, confidences, classIDs, idxs, uniqueIDs
 
     def get_distance(self, item_id, width, height, focal_length=596):
         
