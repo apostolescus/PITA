@@ -5,6 +5,8 @@ Python Intelligent Traffic Assistant
 
 ## **DON'T FORGET BACKUP**
 
+### [ ] Convert scripts for raspbian
+
 ### **Coral TPU:**
  - [x] test tflite model
  - [ ] convert yolov4 lite model
@@ -15,11 +17,13 @@ Python Intelligent Traffic Assistant
 - [x] add switch to GUI 
 - [ ] document improvements
 - [ ] compare to robust lane detection
+- [ ] integrate to alerter
 
 ### **GPS:**
 * [x] mocking module
 * [ ] calculate speed
 * [ ] connect gps module
+
 
 ### **Camera:**
 - [x] test with webCam

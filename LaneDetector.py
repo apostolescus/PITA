@@ -18,6 +18,7 @@ class LaneDetector():
 
     def __region_of_interest(self, image):
         height = image.shape[0]
+        #print("heigh is: ", height)
         polygons = np.array([
                                 [(340, height-150), (920, 550), (1570, height-150)]
                             ])

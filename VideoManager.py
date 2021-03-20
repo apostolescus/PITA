@@ -1,6 +1,5 @@
 import cv2
 import time
-from loguru import logger
 from threading import Lock
 from datetime import datetime
 

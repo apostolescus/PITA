@@ -4,11 +4,14 @@ from VideoManager import VideoManagerSingleton
 from VideoManagerWrapper import VideoManagerWrapper
 from globals import RecordStorage, start_rec
 import logging
+import numpy as np
+
 import cv2
 
 class Alerter:
     def __init__(
         self,
+        danger_area,
         car_type="standard_stock",
         weather_type="dry_asphalt",
         reaction_time=1,
@@ -24,6 +27,7 @@ class Alerter:
         self.recording_mode = 0
         self.recording = False
         self.started = False
+        self.danger_area = danger_area
         
     def update(self):
        
@@ -72,6 +76,10 @@ class Alerter:
 
     
     def draw_image(self, image, detected_bbx, lines=None):
+        height = image.shape[0]
+
+        pts = np.array([[(340, height-150), (920, 550), (1570, height-150)]],
+               np.int32) 
 
         if len(detected_bbx) != 0 :
             boxes = detected_bbx[0]
@@ -80,30 +88,40 @@ class Alerter:
             idxs = detected_bbx[3]
             labels = detected_bbx[4]
             colors = detected_bbx[5]
-            #distances = detected_bbx[6]
-
+            distances = detected_bbx[6]
+            uniqueIDs = detected_bbx[7]
+            objects_ids = detected_bbx[8]
+            
             for i in idxs.flatten():
-
+                
                 x, y = boxes[i][0], boxes[i][1]
                 w, h = boxes[i][2], boxes[i][3]
-
+                
                 color = [int(c) for c in colors[classIDs[i]]]
-                cv2.rectangle(image, (x, y), (x + w, y + h), color, 2)
+                if uniqueIDs[i] in objects_ids:
+                    cv2.rectangle(image, (x, y), (x + w, y + h), (0,0,255), 3)
+                else:
+                    cv2.rectangle(image, (x, y), (x + w, y + h), color, 2)
                 text = "{}: {:.4f}".format(labels[classIDs[i]], confidences[i])
 
                 cv2.putText(image, text, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+        #cv2.polylines(image,pts , True, (255,0,0), 2)
         if lines is not None:
             image = cv2.addWeighted(image, 1, lines, 0.5,1)
         return image
+  
 
-    def check_safety(self, distances):
+    def check_safety(self, bbx_details):
         
+        distances = bbx_details[6]
         safe = True
+
         dictionary = distances.items()
         sorted_distances = sorted(dictionary)
 
         speed = get_speed()
         #print("speed is: ", speed)
+        
         max_distance = self._calculate_max_distance(speed)
         #print("max safe distance is: ", max_distance, "current distances: ", sorted_distances)
         for i in sorted_distances:

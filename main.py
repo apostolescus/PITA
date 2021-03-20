@@ -248,8 +248,8 @@ class AlertThread(StoppableThread):
         gps.start()
         
         self.stop = False
-
-        alerter = Alerter()
+        height = 1080
+        alerter = Alerter([(340, height-150), (920, 550), (1570, height-150)])
 
         while not self.stopevent.isSet():
 
@@ -262,7 +262,7 @@ class AlertThread(StoppableThread):
             res = analyzed_detection_queue.get()
            
             if len(res[1]) != 0:
-                alerter.check_safety(res[1][6])
+                alerter.check_safety(res[1])
             if len(res) == 3:
                 lines = res[2]
             else:
