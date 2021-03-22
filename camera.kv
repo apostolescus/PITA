@@ -113,17 +113,30 @@
             pos_hint: {'center_x':0.5, 'top':0.8}
 
         BoxLayout:
-        	size_hint : 1, 0.5
+        	#size_hint : 1, 0.5
         	padding : 4
         	spacing: 10
         	orientation : 'horizontal'
-        	
-            Label:
-                text:'Lane detection'
-                font_size: 15
-            Switch:
-                id: switch
-                on_active: app.switch_callback()
+
+            BoxLayout:
+                orientation: 'vertical'
+                spacing: 10
+                Label:
+                    text:'Warning Sound'
+                    font_size:15
+                Switch:
+                    id: sound_id
+                    on_active: app.sound_callback()
+
+        	BoxLayout:
+                orientation: 'vertical'
+                spacing:10
+                Label:
+                    text:'Lane detection'
+                    font_size: 15
+                Switch:
+                    id: switch
+                    on_active: app.switch_callback()
 	        Button:
 	            text: 'Start'
 	            background_normal: ''

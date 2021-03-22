@@ -5,7 +5,7 @@ import random
 
 class GPS(StoppableThread):
     def __init__(self, name):
-        self.speed = 30
+        self.speed = 230
         StoppableThread.__init__(self, name=name)
 
     def run(self):

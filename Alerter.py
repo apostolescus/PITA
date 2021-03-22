@@ -1,4 +1,4 @@
-from globals import get_speed, record_mode
+from globals import get_speed, record_mode, switch_sound
 from Storage import FrictionCoefficient, Constants, UISelected
 from VideoManager import VideoManagerSingleton
 from VideoManagerWrapper import VideoManagerWrapper
@@ -138,7 +138,7 @@ class Alerter:
         return image
   
 
-    def check_safety(self, bbx_details):
+    def check_safety(self, bbx_details, sound):
         
         distances = bbx_details[4]
         safe = True
@@ -158,8 +158,9 @@ class Alerter:
              
 
                 # make warning sound
-                t = threading.Thread(target=play_sound)
-                t.start()
+                if sound:
+                    t = threading.Thread(target=play_sound)
+                    t.start()
 
                 
                 #print("Alert")

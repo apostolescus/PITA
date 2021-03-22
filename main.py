@@ -21,6 +21,7 @@ import sys
 import time
 
 switch = False
+switch_sound = False
 check = False
 update = False
 record = False
@@ -180,6 +181,14 @@ class CameraApp(App):
             #lane_detector.join()
             switch = False
 
+    def sound_callback(self):
+        global switch_sound
+        
+        if switch_sound is False:
+            switch_sound = True
+        else:
+            switch_sound = False
+
 class GUIManagerThread(StoppableThread):
     def run(self):
         gui = CameraApp()
@@ -262,7 +271,7 @@ class AlertThread(StoppableThread):
             res = analyzed_detection_queue.get()
            
             if len(res[1]) != 0:
-                alerter.check_safety(res[1])
+                alerter.check_safety(res[1], switch_sound)
             if len(res) == 3:
                 lines = res[2]
             else:
