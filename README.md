@@ -15,15 +15,12 @@ Python Intelligent Traffic Assistant
 - [x] add lane detector to pipeline
 - [x] perform basic lane detection
 - [x] add switch to GUI 
-- [ ] document improvements
 - [ ] compare to robust lane detection
-- [ ] integrate to alerter
 
 ### **GPS:**
 * [x] mocking module
 * [ ] calculate speed
 * [ ] connect gps module
-
 
 ### **Camera:**
 - [x] test with webCam
@@ -34,7 +31,7 @@ Python Intelligent Traffic Assistant
 
 ### **Network:**
 - [x] implement both tf and yolo detection
-- [ ] add detection for TF lite
+- [x] add detection for TF lite
 - [ ] label other images
 - [ ] train network
 - [ ] convert network
@@ -43,6 +40,7 @@ Python Intelligent Traffic Assistant
 - [x] alert only for vehicles on the same 
 lane
 - [x] add connection to Firebase
+- [x] make noise when in danger
 - [ ] send data to firebase when danger
 
 ### **Others:**
@@ -56,6 +54,7 @@ lane
 - [x] recording modes documentation
 - [ ] alert system documentation
 - [ ] distance measure documentation
+- [ ] lane detection
 - [ ] code cleaning
 - [ ] sources organisation in directories
 

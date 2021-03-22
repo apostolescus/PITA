@@ -7,7 +7,13 @@ from AlertLogger import AlerterLogger
 import logging
 import numpy as np
 import time
+import threading
 import cv2
+from playsound import playsound
+
+
+def play_sound():
+    playsound("alert_sounds/beep.mp3")
 
 class Alerter:
     def __init__(
@@ -149,7 +155,13 @@ class Alerter:
             if max_distance > i[0]:
                 safe = False
                 self.alert_logger.add_data(speed, i, time.time(), True)
+             
+
                 # make warning sound
+                t = threading.Thread(target=play_sound)
+                t.start()
+
+                
                 #print("Alert")
                 #if smart mode start recording
                 if RecordStorage.smart is True and self.started is False:
