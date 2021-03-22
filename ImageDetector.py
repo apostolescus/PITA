@@ -12,6 +12,14 @@ from pycoral.utils.edgetpu import make_interpreter
 from pycoral.utils.edgetpu import run_inference
 import uuid
 
+class DetectedObject():
+    def __init__(self, id, score, bbox):
+        self.id = id
+        self.score = score
+        self.bbx = bbox
+        self.unique_id = uuid.uuid4()
+
+    
 class ImageDetector:
     def __init__(
         self,
@@ -69,7 +77,7 @@ class ImageDetector:
     # """
 
 
-    def __get_distances(self, boxes, confidences, classIDs, idxs, height, uniqueIDs, width):
+    def __get_distances(self, mode, detected_list, height):
     # """ Calculates distances and checks if vehicles in front"""
 
         #Done:
@@ -85,11 +93,11 @@ class ImageDetector:
         #polygon used for lane detection
         p1 = Polygon([(340, 150), (920, height - 550), (1570, 150)])
 
+        if detected_list:
+            for i in detected_list:
+                x, y = i.bbx[0], i.bbx[1]
+                w, h = i.bbx[2], i.bbx[3]
 
-        if len(idxs) > 0:
-            for i in idxs.flatten():
-                x, y = boxes[i][0], boxes[i][1]
-                w, h = boxes[i][2], boxes[i][3]
 
                 #calculate overlap area
                 car_area = w*h
@@ -108,44 +116,67 @@ class ImageDetector:
 
                     if intersection_area >= car_area_min_val:
                         print("more than 80% in the interesting zone")
-                        d = self.get_distance(classIDs[i], w, h)
-                        distance_vector[d] = classIDs[i]
-                        id = uniqueIDs[i]
+                        d = self.get_distance(i.id, w, h)
+                        distance_vector[d] = i.id
+                        id = i.unique_id
                         object_position[id] = 0
 
         return distance_vector, object_position
     
     def detect(self, image):
 
-        height, width, ch = image.shape
+        height = image.shape[0]
 
         if self.mode == 0: #yolo modeld
-            boxes, confidences, classIDs, idxs, uniqueIDs = self.make_prediction(image)
+            detected_list = self.make_prediction(image)
 
-            if len(idxs) > 0:
-                distances, frontal_list = self.__get_distances(boxes, confidences, classIDs, idxs, height, uniqueIDs, width)
-                draw_box_parameters = (boxes, confidences, classIDs, idxs, self.labels, self.colors, distances, uniqueIDs, frontal_list)
+            if detected_list:
+                distances, frontal_list = self.__get_distances(True, detected_list, height)
+                draw_box_parameters = (True, detected_list, self.labels, self.colors, distances, frontal_list)
                 
             else:
                 draw_box_parameters = ()
 
             return draw_box_parameters
 
-        # else:
-        #     cv2_im = image
-        #     cv2_im_rgb = cv2.cvtColor(cv2_im, cv2.COLOR_BGR2RGB)
-        #     cv2_im_rgb = cv2.resize(cv2_im_rgb, self.inference_size)
-        #     run_inference(self.interpreter, cv2_im_rgb.tobytes())
-        #     objs = get_objects(self.interpreter, self.threshold)[:self.top_k]
-        #     cv2_im, dictionary = self.append_objs_to_img(cv2_im, self.inference_size, objs, self.labels)
+        else:
+            cv2_im = image
+            cv2_im_rgb = cv2.cvtColor(cv2_im, cv2.COLOR_BGR2RGB)
+            cv2_im_rgb = cv2.resize(cv2_im_rgb, self.inference_size)
+            run_inference(self.interpreter, cv2_im_rgb.tobytes())
+            objs = get_objects(self.interpreter, self.confidence)[:self.top_k]
+
+            detected_list = []
+            height, width, channels = cv2_im.shape
+            scale_x, scale_y = width / self.inference_size[0], height / self.inference_size[1]
+            #convert from object to detectedObject
+            for obj in objs:
+                bbox = obj.bbox.scale(scale_x, scale_y)  
+                x0, y0 = int(bbox.xmin), int(bbox.ymin)
+                x1, y1 = int(bbox.xmax)-x0, int(bbox.ymax)-y0
+                bbox = [x0,y0,x1,y1] 
+
+                detected_obj = DetectedObject(obj.id, obj.score, bbox)
+                detected_obj.label = self.labels[obj.id]
+                detected_obj.color =(255,0,0)
+                detected_list.append(detected_obj)
+
+            if detected_list:
+                distances, frontal_list = self.__get_distances(True, detected_list, height)
+                draw_box_parameters = (False, detected_list, self.labels, self.colors, distances, frontal_list)
+            else:
+                draw_box_parameters = ()
+
+            return draw_box_parameters
+                
+            #cv2_im, dictionary = self.append_objs_to_img(cv2_im, self.inference_size, objs, self.labels)
         
-        # return cv2_im, dictionary
 
     def extract_boxes_confidences_classids(self, outputs, width, height):
         boxes = []
         confidences = []
         classIDs = []
-        unique_id = []
+        #unique_id = []
 
         for output in outputs:
             for detection in output:
@@ -167,9 +198,9 @@ class ImageDetector:
                     boxes.append([x, y, int(w), int(h)])
                     confidences.append(float(conf))
                     classIDs.append(classID)
-                    unique_id.append(uuid.uuid4())
+                    #unique_id.append(uuid.uuid4())
 
-        return boxes, confidences, classIDs, unique_id
+        return boxes, confidences, classIDs
     
     def append_objs_to_img(self, cv2_im, inference_size, objs, labels):
 
@@ -179,6 +210,7 @@ class ImageDetector:
 
         for obj in objs:
             bbox = obj.bbox.scale(scale_x, scale_y)
+            
             x0, y0 = int(bbox.xmin), int(bbox.ymin)
             x1, y1 = int(bbox.xmax), int(bbox.ymax)
 
@@ -233,14 +265,24 @@ class ImageDetector:
         outputs = self.net.forward(self.layer_names)
 
         # Extract bounding boxes, confidences and classIDs
-        boxes, confidences, classIDs, uniqueIDs = self.extract_boxes_confidences_classids(
+        boxes, confidences, classIDs = self.extract_boxes_confidences_classids(
             outputs, width, height
         )
 
         # Apply Non-Max Suppression
+        
         idxs = cv2.dnn.NMSBoxes(boxes, confidences, self.confidence, self.threshold)
+        detected_objects = []
 
-        return boxes, confidences, classIDs, idxs, uniqueIDs
+        if len(idxs) > 0:
+            for i in idxs.flatten():
+                detected_object = DetectedObject(classIDs[i], confidences[i], boxes[i])
+                detected_object.label = self.labels[i]
+                detected_object.color = [int(c) for c in self.colors[classIDs[i]]]
+                detected_objects.append(detected_object)
+
+        return detected_objects
+        #return boxes, confidences, classIDs, idxs, uniqueIDs
 
     def get_distance(self, item_id, width, height, focal_length=596):
         

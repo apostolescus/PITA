@@ -52,6 +52,7 @@ class AlerterLogger():
                 _firebase.post('drivignInfos/', data)
 
         else:
+            #send kivy alert
             print("No internet connection")
 
 def test():

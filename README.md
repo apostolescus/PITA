@@ -5,7 +5,7 @@ Python Intelligent Traffic Assistant
 
 ## **DON'T FORGET BACKUP**
 
-### [ ] Convert scripts for raspbian
+### - [ ] Convert scripts for raspbian
 
 ### **Coral TPU:**
  - [x] test tflite model
@@ -28,11 +28,13 @@ Python Intelligent Traffic Assistant
 ### **Camera:**
 - [x] test with webCam
 - [x] recording modes
-- [x] allow distance measurment
+- [x] implement distance measurment
 - [ ] connect GPIO Camera
 - [ ] connect external screen
 
 ### **Network:**
+- [x] implement both tf and yolo detection
+- [ ] add detection for TF lite
 - [ ] label other images
 - [ ] train network
 - [ ] convert network
@@ -47,7 +49,8 @@ lane
 - [x] GUI
 - [x] Alert system
 - [ ] send information to firebase
-- [ ] allow user to modify fix size time
+- [ ] add GUI button for update
+- [ ] add mode for user to modify fix size time
 
 ### **Docs:**
 - [x] recording modes documentation

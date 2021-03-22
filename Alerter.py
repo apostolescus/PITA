@@ -3,9 +3,10 @@ from Storage import FrictionCoefficient, Constants, UISelected
 from VideoManager import VideoManagerSingleton
 from VideoManagerWrapper import VideoManagerWrapper
 from globals import RecordStorage, start_rec
+from AlertLogger import AlerterLogger
 import logging
 import numpy as np
-
+import time
 import cv2
 
 class Alerter:
@@ -28,6 +29,7 @@ class Alerter:
         self.recording = False
         self.started = False
         self.danger_area = danger_area
+        self.alert_logger = AlerterLogger()
         
     def update(self):
        
@@ -82,29 +84,48 @@ class Alerter:
                np.int32) 
 
         if len(detected_bbx) != 0 :
-            boxes = detected_bbx[0]
-            confidences = detected_bbx[1]
-            classIDs = detected_bbx[2]
-            idxs = detected_bbx[3]
-            labels = detected_bbx[4]
-            colors = detected_bbx[5]
-            distances = detected_bbx[6]
-            uniqueIDs = detected_bbx[7]
-            objects_ids = detected_bbx[8]
+            mode = detected_bbx[0]
             
-            for i in idxs.flatten():
-                
-                x, y = boxes[i][0], boxes[i][1]
-                w, h = boxes[i][2], boxes[i][3]
-                
-                color = [int(c) for c in colors[classIDs[i]]]
-                if uniqueIDs[i] in objects_ids:
-                    cv2.rectangle(image, (x, y), (x + w, y + h), (0,0,255), 3)
-                else:
-                    cv2.rectangle(image, (x, y), (x + w, y + h), color, 2)
-                text = "{}: {:.4f}".format(labels[classIDs[i]], confidences[i])
+            detected_objects = detected_bbx[1]
+            labels = detected_bbx[2]
+            colors = detected_bbx[3]
+            distances = detected_bbx[4]
+            objects_ids = detected_bbx[5]
 
+            for obj in detected_objects:
+                x,y = obj.bbx[0], obj.bbx[1]
+                w,h = obj.bbx[2], obj.bbx[3]
+
+                color = [int(c) for c in colors[obj.id]]
+                cv2.rectangle(image, (x, y), (x + w, y + h), color, 3)
+
+                text = "{}: {:.4f}".format(labels[obj.id], obj.score)
                 cv2.putText(image, text, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+            # if mode is True:
+            #     boxes = detected_bbx[1]
+            #     confidences = detected_bbx[2]
+            #     classIDs = detected_bbx[3]
+            #     idxs = detected_bbx[4]
+            #     labels = detected_bbx[5]
+            #     colors = detected_bbx[6]
+            #     distances = detected_bbx[7]
+            #     uniqueIDs = detected_bbx[8]
+            #     objects_ids = detected_bbx[9]
+                
+
+            #     for i in idxs.flatten():
+                    
+            #         x, y = boxes[i][0], boxes[i][1]
+            #         w, h = boxes[i][2], boxes[i][3]
+                    
+            #         color = [int(c) for c in colors[classIDs[i]]]
+            #         if uniqueIDs[i] in objects_ids:
+            #             cv2.rectangle(image, (x, y), (x + w, y + h), (0,0,255), 3)
+            #         else:
+            #             cv2.rectangle(image, (x, y), (x + w, y + h), color, 2)
+                    
+            #         #text = "{}: {:.4f}".format(labels[classIDs[i.id]], i.score)
+            #         cv2.putText(image, text, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
         #cv2.polylines(image,pts , True, (255,0,0), 2)
         if lines is not None:
             image = cv2.addWeighted(image, 1, lines, 0.5,1)
@@ -113,7 +134,7 @@ class Alerter:
 
     def check_safety(self, bbx_details):
         
-        distances = bbx_details[6]
+        distances = bbx_details[4]
         safe = True
 
         dictionary = distances.items()
@@ -127,6 +148,7 @@ class Alerter:
         for i in sorted_distances:
             if max_distance > i[0]:
                 safe = False
+                self.alert_logger.add_data(speed, i, time.time(), True)
                 # make warning sound
                 #print("Alert")
                 #if smart mode start recording
@@ -137,6 +159,8 @@ class Alerter:
                 # print(
                 #     "max distance: ", max_distance, "current distance: ", i[0]
                 # )
+            else:
+                self.alert_logger.add_data(speed, i, time.time(), False)
         #if now in safe state and in smart mode stop recording
         if safe is True and RecordStorage.smart is True and self.started is True:
             print("stopping smart recording")
