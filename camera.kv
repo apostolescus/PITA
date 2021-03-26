@@ -7,6 +7,10 @@
 #:set background_color "303841"
 #:set secondary_bg_color "3a4750"
 
+#:set font_light "Nunito-Light"
+#:set font_regular "Nunito-Regular"
+#:set font_bold "Nunito-Bold"
+
 <CustomLabel@Label>:
 	font_size : '18dp' 
 	color : rgba(text_color)
@@ -123,7 +127,8 @@
                 spacing: 10
                 Label:
                     text:'Warning Sound'
-                    font_size:15
+                    font_size: 20
+                    font_name: font_bold
                 Switch:
                     id: sound_id
                     on_active: app.sound_callback()
@@ -133,25 +138,52 @@
                 spacing:10
                 Label:
                     text:'Lane detection'
-                    font_size: 15
+                    font_size: 20
+                    font_name: font_bold
                 Switch:
                     id: switch
                     on_active: app.switch_callback()
-	        Button:
-	            text: 'Start'
-	            background_normal: ''
-                background_color:  rgba(secondary_bg_color)
-	            font_size: 20
-	            on_release: app.start_vid()
-	        Button:
+            BoxLayout:
+                orientation: 'vertical'
+                
+                Label:
+                    text:'Video Manager'
+                    font_size: 20
+                    font_name: font_bold
 
-	            text: 'Stop'
-	            background_normal: ''
-                background_color:  rgba(highlight)
-	            font_size: 20
-	            on_release: app.stop_vid()
+                BoxLayout: 
+                    orientation:'horizontal'
+                    Button:
+                        text: 'Start'
+                        font_name: font_regular
+                        background_normal: ''
+                        background_color:  rgba(secondary_bg_color)
+                        font_size: 17
+                        on_release: app.start_vid()
+                    Button: 
+                        text: 'Stop'
+                        font_name: font_regular
+                        background_normal: ''
+                        background_color:  rgba(highlight)
+                        font_size: 17
+                        on_release: app.stop_vid()
+            BoxLayout:
+                orientation: 'vertical'
+                spacing:10
 
-  
+                Label:
+                    text:'Upload to Cloud'
+                    font_size: 20
+                    font_name: font_bold
+
+                Button:
+                    text: 'Upload'
+                    font_name: font_regular
+                    background_normal: ''
+                    background_color: rgba(highlight)
+                    font_size: 17
+                    on_release: app.update_data()
+
 
 <Screen_Two>:
     name: 'screen_two'      #<<<<<<<<<<<<<<<<

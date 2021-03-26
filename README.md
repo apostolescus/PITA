@@ -7,6 +7,18 @@ Python Intelligent Traffic Assistant
 
 ### - [ ] Convert scripts for raspbian
 
+### **Server:** 
+- [x] send single image localhost basic connection
+- [ ] impelment UPDATE request
+- [ ] implement DETECT request
+- [ ] send multiple images localhost basic connection
+- [ ] add image detection 
+- [ ] add lane detection
+
+### **Client:**
+- [x] establish localhost connection
+- [ ] implement capture-display pipeline
+
 ### **Coral TPU:**
  - [x] test tflite model
  - [ ] convert yolov4 lite model

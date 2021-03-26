@@ -28,6 +28,7 @@ record = False
 stop = False
 videoManager = VideoManagerWrapper.getInstance()
 
+#mode = "1"
 mode = 0
 
 # Queues for pipeline
@@ -189,6 +190,13 @@ class CameraApp(App):
         else:
             switch_sound = False
 
+    def update_data(self):
+        for thread in enumerate():
+            if thread.name == "AlerterThread":
+                thread.update_data()
+
+
+
 class GUIManagerThread(StoppableThread):
     def run(self):
         gui = CameraApp()
@@ -250,7 +258,7 @@ class LaneDetectorThread(StoppableThread):
 class AlertThread(StoppableThread):
     
     def run(self):
-        global third_queue, result_queue, detected_object_queue, update
+        global result_queue, detected_object_queue, update
         
         #starts GPS thread
         gps = GPS("GPSThread")
@@ -258,30 +266,34 @@ class AlertThread(StoppableThread):
         
         self.stop = False
         height = 1080
-        alerter = Alerter([(340, height-150), (920, 550), (1570, height-150)])
+        self.alerter = Alerter([(340, height-150), (920, 550), (1570, height-150)])
 
         while not self.stopevent.isSet():
 
             if update is True:
                 videoManager.stop()
-                alerter.update()
+                self.alerter.update()
                 videoManager.update()
                 update = False
             
             res = analyzed_detection_queue.get()
            
             if len(res[1]) != 0:
-                alerter.check_safety(res[1], switch_sound)
+                self.alerter.check_safety(res[1], switch_sound)
             if len(res) == 3:
                 lines = res[2]
             else:
                 lines = None
-            drawn_image = alerter.draw_image(res[0], res[1], lines)
+
+            drawn_image = self.alerter.draw_image(res[0], res[1], lines)
             result_queue.put(drawn_image)
 
             
         print("Alerter stopped")
 
+    def update_data(self):
+        self.alerter.update_alert_logger()
+        
 if __name__ == '__main__':
     
     imageDetector = ImageObjectDetectorThread("imageDetector")
