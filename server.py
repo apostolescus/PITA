@@ -21,7 +21,6 @@ def add_connection(sock):
     conn.setblocking(False)
     message = server_message.Message(selector, conn, addr)
     selector.register(conn, selectors.EVENT_READ, message)
-    print("Connection added")
 
 try:
     while True:
@@ -40,23 +39,9 @@ try:
                         f"{message.addr}:\n{traceback.format_exc()}",
                     )
                     message.close()
+                    
 except KeyboardInterrupt:
     print("caught keyboard interrupt, exiting")
 finally:
     selector.close()
  
-
-# with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-#     s.bind((HOST, PORT))
-#     s.listen()
-#     #s.setblocking(False)
-#     conn, addr = s.accept()
-
-#     with conn:
-#         print('Connected by: ', addr)
-#         while True:
-#             buffer = conn.recv()
-#             print("I've recived some data")
-#             if not data:
-#                 break
-#             print("Data", data)

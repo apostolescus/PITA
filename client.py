@@ -10,6 +10,8 @@ import client_message
 HOST = "127.0.0.1"
 PORT = 65432
 
+counter = 0
+
 sel = selectors.DefaultSelector()
 
 def generate_request():

@@ -4,6 +4,27 @@ import sys
 import struct
 import io
 
+import cv2
+import base64
+import uuid
+counter = 0
+max_val = 10000
+
+mute = True
+
+cam = cv2.VideoCapture(0)
+
+def get_image():
+    #cam = cv2.VideoCapture(0)
+    ret, frame = cam.read()
+
+    
+    if ret is True:
+        return frame
+        # encoded_image = base64.b64encode(cv2.imencode('.jpg', frame)[1])
+        # return encoded_image
+
+
 class Message:
     def __init__(self, selector, sock, addr, request):
         self.selector = selector
@@ -14,6 +35,7 @@ class Message:
         self._read_header = True
         self._send_buffer = b""
         self._recv_buffer = b""
+        self._current_image = None
 
     def process_message(self, mask):
         if mask & selectors.EVENT_WRITE:
@@ -36,10 +58,16 @@ class Message:
     def _set_selector_events_mask(self, mode):
         """Set selector to listen for events: mode is 'r', 'w', or 'rw'."""
         if mode == "r":
+            if not mute:
+                print("---main thread--- client switched to listen mode")
             events = selectors.EVENT_READ
         elif mode == "w":
+            if not mute:
+                print("---main thread--- client switched to write mode")
             events = selectors.EVENT_WRITE
         elif mode == "rw":
+            if not mute:
+                print("---main thread--- client switched to read/write mode")
             events = selectors.EVENT_READ | selectors.EVENT_WRITE
         else:
             raise ValueError(f"Invalid events mask mode {repr(mode)}.")
@@ -47,16 +75,21 @@ class Message:
 
     def _generate_request(self):
         
-        content = self._request["content"]
+
+        self._current_image = get_image()
+        content = base64.b64encode(cv2.imencode('.jpg', self._current_image)[1])
+
         mode = self._request["mode"]
 
         if mode == "detect":
             header = {
                     "request-type":"DETECT",
                     "content-len":len(content),
-                    "encode-type":"base64"
+                    "encode-type":"base64",
+                    "request-id":str(uuid.uuid4())
                     }
-
+            if not mute:
+                print("Request id: ", header["request-id"])
             encoded_header = self._json_encode(header)
             # print("Encoded header: ", encoded_header)
             message_hdr = struct.pack("<H", len(encoded_header))
@@ -70,9 +103,16 @@ class Message:
         return msg
 
     def write(self):
+        global counter
+
+        if  counter == max_val:
+            self.close()
+            return
+        counter+=1
 
         if self._request_done is False:
             self._generate_request()
+        
         self._write()
 
         if self._request_done:
@@ -84,6 +124,8 @@ class Message:
         if self._send_buffer:
             try:
                 sent = self.sock.send(self._send_buffer)
+                if not mute:
+                    print("--- main thread --- Sended: ", sent)
             except BlockingIOError:
                 pass
             else:
@@ -101,16 +143,62 @@ class Message:
 
         if len(self._recv_buffer) >= header_len:
             self.json_header = self._json_decode(self._recv_buffer[:header_len])
+            #print("--json header --- ", self.json_header)
             self._recv_buffer = self._recv_buffer[header_len:]
             # print("Json header: ", self.json_header)
 
     def _process_request(self):
-        content_len = self.json_header["content-len"]
+        
+        json_type = self.json_header["response-type"]
+        response_id = self.json_header["response-id"]
+        if not mute:
+            print("JSON type", json_type)
+        # print("Response id:", response_id)
+        if json_type == "EMPTY":
+            self._read_header = True
+            self._request_done  = False
+            self.write()
+            
+            #send another frame
+        elif json_type == "DETECTED":
+            self._request_done  = False
+            content_len = self.json_header["content-len"]
+            if len(self._recv_buffer) >= content_len:
+                self._read_header = True
+                data = self._recv_buffer[:content_len]
+                self._recv_buffer = self._recv_buffer[content_len:]
+                #print("String is: ", str(data))
+                decoded_response = self._json_decode(data)
 
-        if len(self._recv_buffer) >= content_len:
-            data = self._recv_buffer[:content_len]
-            print("String is: ", str(data))
+                self._display_image(decoded_response)
+                # print("Response is: ", decoded_response)
+                self._set_selector_events_mask("w")
 
+        cv2.imshow("readimg", self._current_image)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+                return
+
+    def _display_image(self, response):    
+
+        
+        # decoded_json = json.loads(decoded_response)
+
+        obj_list = response["detected_objects"]
+
+        for obj in obj_list:
+            x,y  = obj["coordinates"][0], obj["coordinates"][1] 
+            w,h = obj["coordinates"][2], obj["coordinates"][3]
+
+            color = obj["color"]
+            label = obj["label"]
+            score = obj["score"]
+            text = "{}: {:.4f}".format(label, score)
+            image = self._current_image
+
+            cv2.rectangle(image, (x,y), (x+w, y+h), color, 2)
+            cv2.putText(image, text, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+
+            self._current_image = image
     def _read(self):
 
         try:

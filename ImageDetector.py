@@ -11,12 +11,15 @@ from pycoral.utils.dataset import read_label_file
 from pycoral.utils.edgetpu import make_interpreter
 from pycoral.utils.edgetpu import run_inference
 import uuid
+import time
 
 class DetectedObject():
-    def __init__(self, id, score, bbox):
+    def __init__(self, id, score, bbox, label, color):
         self.id = id
         self.score = score
         self.bbx = bbox
+        self.color = color
+        self.label = label
         self.unique_id = uuid.uuid4()
 
     
@@ -60,6 +63,7 @@ class ImageDetector:
        
         self.confidence = confidence
         self.threshold = threshold
+        self.start = time.time()
         self.average_size = csv.DictReader(average_size)
         self.colors = np.random.randint(
             0, 255, size=(len(self.labels), 3), dtype="uint8"
@@ -98,7 +102,6 @@ class ImageDetector:
                 x, y = i.bbx[0], i.bbx[1]
                 w, h = i.bbx[2], i.bbx[3]
 
-
                 #calculate overlap area
                 car_area = w*h
                 car_area_min_val = 80/100*car_area
@@ -127,56 +130,57 @@ class ImageDetector:
 
         height = image.shape[0]
 
-        if self.mode == 0: #yolo modeld
-            detected_list = self.make_prediction(image)
+        if time.time() - self.start > 0.1:
+            if self.mode == 0: #yolo modeld
+                detected_list = self.make_prediction(image)
 
-            if detected_list:
-                distances, frontal_list = self.__get_distances(True, detected_list, height)
-                draw_box_parameters = (True, detected_list, self.labels, self.colors, distances, frontal_list)
-                
+                if detected_list:
+                    distances, frontal_list = self.__get_distances(True, detected_list, height)
+                    draw_box_parameters = (detected_list, distances, frontal_list)
+                else:
+                    draw_box_parameters = ()
+
+                self.start = time.time()
+                return draw_box_parameters
+
             else:
-                draw_box_parameters = ()
+                cv2_im = image
+                cv2_im_rgb = cv2.cvtColor(cv2_im, cv2.COLOR_BGR2RGB)
+                cv2_im_rgb = cv2.resize(cv2_im_rgb, self.inference_size)
+                run_inference(self.interpreter, cv2_im_rgb.tobytes())
+                objs = get_objects(self.interpreter, self.confidence)[:self.top_k]
 
-            return draw_box_parameters
+                detected_list = []
+                height, width, channels = cv2_im.shape
+                scale_x, scale_y = width / self.inference_size[0], height / self.inference_size[1]
+                #convert from object to detectedObject
+                for obj in objs:
+                    bbox = obj.bbox.scale(scale_x, scale_y)  
+                    x0, y0 = int(bbox.xmin), int(bbox.ymin)
+                    x1, y1 = int(bbox.xmax)-x0, int(bbox.ymax)-y0
+                    bbox = [x0,y0,x1,y1] 
 
+                    label = self.labels[obj.id]
+                    color = self.colors[obj.id]
+                    detected_obj = DetectedObject(obj.id, obj.score, bbox, label, color)
+                    detected_list.append(detected_obj)
+
+                if detected_list:
+                    distances, frontal_list = self.__get_distances(True, detected_list, height)
+                    draw_box_parameters = (detected_list, distances, frontal_list)
+                else:
+                    draw_box_parameters = ()
+                    
+                self.start = time.time()
+                return draw_box_parameters
         else:
-            cv2_im = image
-            cv2_im_rgb = cv2.cvtColor(cv2_im, cv2.COLOR_BGR2RGB)
-            cv2_im_rgb = cv2.resize(cv2_im_rgb, self.inference_size)
-            run_inference(self.interpreter, cv2_im_rgb.tobytes())
-            objs = get_objects(self.interpreter, self.confidence)[:self.top_k]
-
-            detected_list = []
-            height, width, channels = cv2_im.shape
-            scale_x, scale_y = width / self.inference_size[0], height / self.inference_size[1]
-            #convert from object to detectedObject
-            for obj in objs:
-                bbox = obj.bbox.scale(scale_x, scale_y)  
-                x0, y0 = int(bbox.xmin), int(bbox.ymin)
-                x1, y1 = int(bbox.xmax)-x0, int(bbox.ymax)-y0
-                bbox = [x0,y0,x1,y1] 
-
-                detected_obj = DetectedObject(obj.id, obj.score, bbox)
-                detected_obj.label = self.labels[obj.id]
-                detected_obj.color =(255,0,0)
-                detected_list.append(detected_obj)
-
-            if detected_list:
-                distances, frontal_list = self.__get_distances(True, detected_list, height)
-                draw_box_parameters = (False, detected_list, self.labels, self.colors, distances, frontal_list)
-            else:
-                draw_box_parameters = ()
-
-            return draw_box_parameters
-                
+            return ()
             #cv2_im, dictionary = self.append_objs_to_img(cv2_im, self.inference_size, objs, self.labels)
         
-
     def extract_boxes_confidences_classids(self, outputs, width, height):
         boxes = []
         confidences = []
         classIDs = []
-        #unique_id = []
 
         for output in outputs:
             for detection in output:
@@ -198,7 +202,6 @@ class ImageDetector:
                     boxes.append([x, y, int(w), int(h)])
                     confidences.append(float(conf))
                     classIDs.append(classID)
-                    #unique_id.append(uuid.uuid4())
 
         return boxes, confidences, classIDs
     
@@ -276,9 +279,11 @@ class ImageDetector:
 
         if len(idxs) > 0:
             for i in idxs.flatten():
-                detected_object = DetectedObject(classIDs[i], confidences[i], boxes[i])
-                detected_object.label = self.labels[i]
-                detected_object.color = [int(c) for c in self.colors[classIDs[i]]]
+            
+                label = self.labels[classIDs[i]]
+                #print("detected: ", label)
+                color = [int(c) for c in self.colors[classIDs[i]]]
+                detected_object = DetectedObject(classIDs[i], confidences[i], boxes[i], label, color)
                 detected_objects.append(detected_object)
 
         return detected_objects
