@@ -1,0 +1,285 @@
+#:import utils kivy.utils
+#:import rgba kivy.utils.get_color_from_hex
+#:import SlideTransition kivy.uix.screenmanager.SlideTransition
+
+#:set text_color "eeeeee"
+#:set highlight "00adb5"
+#:set background_color "303841"
+#:set secondary_bg_color "3a4750"
+
+#:set font_light "fonts/Nunito-Light"
+#:set font_regular "fonts/Nunito-Regular"
+#:set font_bold "fonts/Nunito-Bold"
+
+<CustomLabel@Label>:
+	font_size : '18dp' 
+	color : rgba(text_color)
+	font_familt : 'Roboto'
+	bold: True
+	size_hint : (0.3, 1)
+
+<SpinnerRounded@Spinner>:
+	background_color: 0,0,0,0
+	color : rgba(text_color)
+	font_size : '20dp'
+	spacing : 5
+	font_family: 'Regular'
+    canvas.before:
+        Color:
+            rgba: utils.get_color_from_hex(highlight)
+        RoundedRectangle:
+            pos: self.pos
+            size: self.size
+            radius: [(10, 10), (10, 10), (10, 10), (10, 10)]
+
+<ButtonRounded@Button>:
+	
+	background_color: (0,0,0,0)
+	background_normal : ''
+	color: rgba(text_color)
+	canvas.before:
+        Color:
+            rgba: utils.get_color_from_hex(secondary_bg_color)
+        RoundedRectangle:
+            pos: self.pos
+            size: self.size
+            #radius: [18]
+
+	font_size : 20
+	spacing : 5
+	font_family: 'Regular'
+	on_press : 
+<Display>:
+    canvas.before:
+        Color:
+            rgba: utils.get_color_from_hex(background_color)
+        Rectangle:
+            pos: self.pos
+            size: self.size
+    BoxLayout:
+        orientation: "vertical"
+
+        BoxLayout:
+        	padding : 4
+        	spacing: 10
+            size_hint: 1, None
+            
+            canvas.before:
+		        Color:
+		            rgba: utils.get_color_from_hex(background_color)
+		        Rectangle:
+		            pos: self.pos
+		            size: self.size
+        
+            height: '48dp'
+            Button:
+                text: 'PITA'
+                font_size : 22
+                color: rgba(text_color)
+                background_normal: ''
+                background_color:  rgba(secondary_bg_color)
+                on_release: sm.current = 'screen_one'  #<<<<<<<<<<<<<<<<
+
+            Button:
+                text: 'Setari'
+                font_size: 22
+                color: rgba(text_color)
+                background_normal: ''
+                background_color:  rgba(secondary_bg_color)
+                on_release: 
+                	
+                	sm.current = 'screen_two'  #<<<<<<<<<<<<<<<<
+
+        ScreenManager:
+            id: sm
+
+            Screen_One:
+            Screen_Two:
+
+<Screen_One>:
+    name: 'screen_one'      #<<<<<<<<<<<<<<<<
+    canvas.before:
+        Color:
+            rgba: utils.get_color_from_hex(background_color)
+        Rectangle:
+            pos: self.pos
+            size: self.size
+    BoxLayout:
+    	orientation : 'vertical'
+        Image:
+        	
+            # this is where the video will show
+            # the id allows easy access
+            id: imageView
+            size_hint: 1, 6
+            allow_stretch: True  # allow the video image to be scaled
+            keep_ratio: True  # keep the aspect ratio so people don't look squashed
+            pos_hint: {'center_x':0.5, 'top':0.8}
+
+        BoxLayout:
+        	#size_hint : 1, 0.5
+        	padding : 4
+        	spacing: 10
+        	orientation : 'horizontal'
+
+            BoxLayout:
+                orientation: 'vertical'
+                spacing: 10
+                spacing:10
+                Label:
+                    text:'Warning Sound'
+                    font_size: 20
+                    font_name: font_bold
+                Switch:
+                    id: sound_id
+                    on_active: app.sound_callback()
+
+        	BoxLayout:
+                orientation: 'vertical'
+                spacing:10
+                spacing:10
+                Label:
+                    text:'Lane detection'
+                    font_size: 20
+                    font_name: font_bold
+                Switch:
+                    id: switch
+                    on_active: app.switch_callback()
+            BoxLayout:
+                orientation: 'vertical'
+                
+                Label:
+                    text:'Video Manager'
+                    font_size: 20
+                    font_name: font_bold
+
+                BoxLayout: 
+                    orientation:'horizontal'
+                    padding:5
+                    #spacing:10
+
+                    Button:
+                        text: 'Start'
+                        font_name: font_regular
+                        background_normal: ''
+                        background_color:  rgba(secondary_bg_color)
+                        font_size: 17
+                        on_release: app.start_vid()
+                    Button: 
+                        text: 'Stop'
+                        font_name: font_regular
+                        background_normal: ''
+                        background_color:  rgba(highlight)
+                        font_size: 17
+                        on_release: app.stop_vid()
+            BoxLayout:
+                orientation: 'vertical'
+                spacing:10
+                padding:5
+
+                Label:
+                    text:'Upload to Cloud'
+                    font_size: 20
+                    font_name: font_bold
+
+                Button:
+                    text: 'Upload'
+                    font_name: font_regular
+                    background_normal: ''
+                    background_color: rgba(highlight)
+                    font_size: 17
+                    on_release: app.update_data()
+
+
+<Screen_Two>:
+    name: 'screen_two'      #<<<<<<<<<<<<<<<<
+    canvas.before:
+        Color:
+            rgba: utils.get_color_from_hex(background_color)
+        Rectangle:
+            pos: self.pos
+            size: self.size
+        
+
+    BoxLayout:
+        orientation: 'vertical'
+        padding : 10
+        BoxLayout:
+            padding : 10
+            CustomLabel: 
+                text: "Tipul masinii"
+                size_hint : (0.3, 1)
+            SpinnerRounded:
+                id: whatever
+                text: "Standard"                   #default value showed
+                values: ["Camion","Autobuz","Curse"]       #list of values to show
+                on_text:
+                    root.on_spinner_select(self.text)
+                size_hint : (0.7, 1)
+        BoxLayout:
+            CustomLabel:
+            	size_hint : (0.5, 1)
+                text: 'Timpul de reactie este: %s secunde' % float(slider.value) if slider.value else 'Selecteaza timpul de reactie'
+
+            Slider:
+                id: slider
+                min: 0.5
+                max: 2
+                step: 0.5
+                on_value: root.on_slider_change_value(slider.value)
+                orientation: 'horizontal'
+                size_hint: (0.5, 1)
+
+        BoxLayout:
+            padding : 10
+            CustomLabel: 
+                text: "Starea soselei"
+
+            SpinnerRounded:
+            	
+                id: whatever
+                text: "Uscat"                   #default value showed
+                values: ["Umed","Zapada","Gheata"]       #list of values to show
+                on_text:
+                    root.on_spinner_select_weather_type(self.text)
+                size_hint : (0.7, 1)
+   
+        
+        BoxLayout:
+            padding : 10
+            CustomLabel: 
+                text: "Experienta"
+               
+            SpinnerRounded:
+            	
+                id: whatever
+                text: "Incepator"                   #default value showed
+                values: ["Incepator","Mediu","Avansat"]       #list of values to show
+                on_text:
+                    root.on_spinner_select_driver_experience(self.text)
+                size_hint : (0.7, 1)
+        BoxLayout:
+            padding : 10
+            CustomLabel: 
+                text: "Inregistrare"
+
+            SpinnerRounded:
+                id: whatever
+                text: "Smart Mode"                   #default value showed
+                values: ["Permanent","Fix sized","Smart Mode", "No rec"]       #list of values to show
+                on_text:
+                    root.on_spinner_select_record_type(self.text)
+                size_hint : (0.7, 1)
+        
+            
+        ButtonRounded:
+
+            size_hint : .5, .5
+            center: self.parent.center
+            pos_hint : {'center_x' : 0.5}
+            text: 'Salveaza'
+            on_press: root.update_settings()
+            #on_release: print("ahhh")
+            #on_state:
+                #print("my current state is {}".format(self.state))
+                
