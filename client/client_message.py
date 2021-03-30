@@ -74,22 +74,33 @@ class Message:
             # send update message
             toggle_update_message()
 
-            header = {
-                "request-type" : "UPDATE",
-                "lane" : UISelected.lane_detection,
-                "car_type" : UISelected.car_type,
-                "weather" : UISelected.weather,
-                "experience" : UISelected.experience,
-                "rec_mode" : UISelected.rec_mode,
-                "reaction_time" : UISelected.reaction_time
-            }
+            if UISelected.updated:
+                
+                header = {
+                    "request-type" : "UPDATE",
+                    "update":1,
+                    "lane" : UISelected.lane_detection,
+                    "car_type" : UISelected.car_type,
+                    "weather" : UISelected.weather,
+                    "experience" : UISelected.experience,
+                    "record_mode" : UISelected.rec_mode,
+                    "reaction_time" : UISelected.reaction_time
+                }
 
+                UISelected.updated = False
+            else:
+                header = {
+                    "request-type" : "UPDATE",
+                    "update":0,
+                    "lane" : UISelected.lane_detection,
+                }
             encoded_header = self._json_encode(header)
             message_hdr = struct.pack("<H", len(encoded_header))
             msg = message_hdr + encoded_header
 
         else:
             self._current_image = captured_image_queue.get()
+           
             content = base64.b64encode(cv2.imencode('.jpg', self._current_image)[1])
             
             header = {
@@ -183,9 +194,7 @@ class Message:
                 self._set_selector_events_mask("w")
 
         result_queue.put(self._current_image)
-        # cv2.imshow("readimg", self._current_image)
-        # if cv2.waitKey(1) & 0xFF == ord('q'):
-        #         return
+
 
     def _display_image(self, response):    
 
@@ -193,6 +202,9 @@ class Message:
         # decoded_json = json.loads(decoded_response)
 
         obj_list = response["detected_objects"]
+        danger = response["danger"]
+        
+        #("Danger is: ", danger)
 
         for obj in obj_list:
             x,y  = obj["coordinates"][0], obj["coordinates"][1] 
@@ -212,7 +224,7 @@ class Message:
     def _read(self):
 
         try:
-            data = self.sock.recv(1024)
+            data = self.sock.recv(2048)
         except BlockingIOError:
             pass
         else:

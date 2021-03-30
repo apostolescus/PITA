@@ -6,8 +6,9 @@ class CameraManagerSingleton:
 
     _lock = Lock()
     __instance = None
+
     @staticmethod
-    def getInstance(mode, path="video/good.mp4"):
+    def getInstance(mode, path="../video/good.mp4"):
         if CameraManagerSingleton.__instance == None:
             CameraManagerSingleton(mode, path)
         return CameraManagerSingleton.__instance
@@ -23,10 +24,15 @@ class CameraManagerSingleton:
         
         ret, frame = self.camera.read()
 
+        frame_shape = frame.shape
+
         if ret is True:
-            self.frame = frame
-            
-            return frame
+            if frame_shape[0] > 480 or frame_shape[1] > 640:
+                resized = cv2.resize(frame, (640, 480), interpolation=cv2.INTER_AREA)
+                self.frame = resized
+            else:
+                self.frame = frame
+            return self.frame
         
 
     def closeCamera(self):

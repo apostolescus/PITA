@@ -4,8 +4,13 @@ import io
 import json
 import base64
 import cv2
+import copy
 import numpy as np
+
 from ImageDetector import ImageDetector, DetectedObject
+from Alerter import Alerter, Update
+from Storage import StoppableThread
+from Storage import DetectedPipeline
 
 import uuid
 import threading 
@@ -13,13 +18,64 @@ import time
 from datetime import datetime
 from queue import Queue, Empty
 
+lane_detection = False
+
 # waiting_image_queue = Queue(1)
 image_detection_queue = Queue(1)
 lane_detection_queue = Queue(1)
 alerter_queue = Queue(1)
 results_queue = Queue(1)
 
-class ImageObjectDetectorThread(threading.Thread):
+#debugging
+debug_mode = False
+
+
+class AlertThread(StoppableThread):
+    
+    def __init__(self, name):
+        
+        super(AlertThread, self).__init__(name)
+        height = 1080
+        self.alerter = Alerter([(340, height-150), (920, 550), (1570, height-150)])
+    
+    def update(self, update):
+        #rint("UPDATINNNNNNG")
+        #print("update object: ", update)
+        self.alerter.update(update)
+
+    def run(self):
+        global lane_detection_queue
+        
+        # starts GPS thread
+        # gps = GPS("GPSThread")
+        # gps.start()
+        
+        self.stop = False
+
+        while not self.stopevent.isSet():
+
+            # if update is True:
+            #     videoManager.stop()
+            #     self.alerter.update()
+            #     videoManager.update()
+            #     update = False
+            
+            third_step = alerter_queue.get()
+            
+            #self.alerter.video_manager.record(image)
+            self.alerter.check_safety(third_step)
+            
+
+            #drawn_image = self.alerter.draw_image(res[0], res[1], lines)
+            results_queue.put(third_step)
+
+            
+        print("Alerter stopped")
+
+    def update_data(self):
+        self.alerter.update_alert_logger()
+
+class ImageObjectDetectorThread(StoppableThread):
 
     def run(self):
 
@@ -32,10 +88,15 @@ class ImageObjectDetectorThread(threading.Thread):
             read_image = image_detection_queue.get()
 
             detection_results = imageDetector.detect(read_image)
+            result = [read_image, detection_results]
 
-            results_queue.put(detection_results)
+            if lane_detection:
+                lane_detection_queue.put(result)
+            else:
+                alerter_queue.put(result)
             
-image_det = ImageObjectDetectorThread().start()
+image_thread = ImageObjectDetectorThread("image_detector").start()
+alerter_thread = AlertThread("alerter").start()
 
 class Message:
     def __init__(self, selector, sock, addr):
@@ -61,13 +122,16 @@ class Message:
     def _set_selector_events_mask(self, mode):
         """Set selector to listen for events: mode is 'r', 'w', or 'rw'."""
         if mode == "r":
-            print("--- main thread --- Server switched to read mode")
+            if debug_mode:
+                print("--- main thread --- Server switched to read mode")
             events = selectors.EVENT_READ
         elif mode == "w":
-            print("--- main thread --- Server switched to write mode")
+            if debug_mode:
+                print("--- main thread --- Server switched to write mode")
             events = selectors.EVENT_WRITE
         elif mode == "rw":
-            print("--- main thread --- Server switched to read/write mode")
+            if debug_mode:
+                print("--- main thread --- Server switched to read/write mode")
             events = selectors.EVENT_READ | selectors.EVENT_WRITE
         else:
             raise ValueError(f"Invalid events mask mode {repr(mode)}.")
@@ -131,9 +195,7 @@ class Message:
             self._data = self._recv_buffer[:self._header_len]
             self._recv_buffer = self._recv_buffer[self._header_len:]
             self._read_header = True
-
-            
-
+     
     def _signal_working(self):
       
         self._set_selector_events_mask("w")
@@ -155,28 +217,33 @@ class Message:
 
     def _process_results(self):
 
-        detected_list = self._results[0]
-
+        detected_obj = self._results[1]
         dictionary = {}
-        test_list = []
 
-        for obj in detected_list:
+        if detected_obj:
+            if detected_obj.detected:
+                
+                formatted_list = []
+                detected_list = detected_obj.detected_objects
 
-            obj_dictionary = {}
-            obj_dictionary["coordinates"] = obj.bbx
+                for obj in detected_list:
 
-            color = obj.color
-            label = obj.label
-            score = obj.score
+                    obj_dictionary = {}
+                    obj_dictionary["coordinates"] = obj.bbx
 
-            obj_dictionary["color"] = color
-            obj_dictionary["label"] = label
-            obj_dictionary["score"] = score
+                    color = obj.color
+                    label = obj.label
+                    score = obj.score
 
-            test_list.append(obj_dictionary)
+                    obj_dictionary["color"] = color
+                    obj_dictionary["label"] = label
+                    obj_dictionary["score"] = score
 
-        dictionary["detected_objects"] = test_list
+                    formatted_list.append(obj_dictionary)
 
+                dictionary["detected_objects"] = formatted_list
+                dictionary["danger"] = detected_obj.danger
+             
         self._results = dictionary
 
     def read(self):
@@ -193,7 +260,7 @@ class Message:
         if self._read_header:
             # the full message was received 
             # process it's content
-            print("--- main thread --- Full message was received")
+            # print("--- main thread --- Full message was received")
             
             if self.json_header["request-type"] == "DETECT":
 
@@ -216,16 +283,27 @@ class Message:
                 self._set_selector_events_mask("w")
 
             elif self.json_header["request-type"] == "UPDATE":
-                    
-                lane_det = self.json_header["lane"]
-                car_type = self.json_header["car_type"]
-                weather = self.json_header["weather"]
-                experience = self.json_header["experience"]
+                
+                update_mode = self.json_header["update"]
+
+                if update_mode == 1:
+                    car_type = self.json_header["car_type"]
+                    weather = self.json_header["weather"]
+                    experience = self.json_header["experience"]
+                    reaction_time = self.json_header["reaction_time"]
+                    record_mode = self.json_header["record_mode"]
+                    lane_det = self.json_header["lane"]
+                    update = Update(1, lane_det, record_mode, car_type, weather, experience,
+                     reaction_time)
+
+                else:
+                    lane_det = self.json_header["lane"]
+                    update = Update(0, lane_det)
 
                 #update local detector and alerter
-
-                print("JUST RECEIVED: ")
-                print("lane det: ", lane_det) 
+                for thread in threading.enumerate():
+                    if thread.name == "alerter":
+                        thread.update(update)
 
                 self._results = ""
                 self._set_selector_events_mask("w")
@@ -233,12 +311,12 @@ class Message:
     def _generate_request(self):
 
         response = self._results
-        encoded_response = self._json_encode(response)
         
         # objects succesfully detected
         # send response
         
-        if len(self._results) >= 1:
+        if len(response) >=1:
+            encoded_response = self._json_encode(response)
             header = {
                     'danger':0,
                     'response-type':'DETECTED',
@@ -270,7 +348,8 @@ class Message:
         if self._send_buffer:
             try:
                 sent = self.sock.send(self._send_buffer)
-                print("--- main thread --- Sended :" , sent)
+                if debug_mode:
+                    print("--- main thread --- Sended :" , sent)
                 self._request_done = False
             except BlockingIOError:
                 pass

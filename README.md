@@ -9,15 +9,17 @@ Python Intelligent Traffic Assistant
 
 ### **Server:** 
 - [x] send single image localhost basic connection
-- [ ] impelment UPDATE request
-- [ ] implement DETECT request
-- [ ] send multiple images localhost basic connection
-- [ ] add image detection 
+- [x] implement DETECT request
+- [x] send multiple images localhost basic connection
+- [x] add image detection 
+- [x] implement UPDATE request
+- [ ] implement UPDATE backend 
 - [ ] add lane detection
+- [ ] add alert 
 
 ### **Client:**
 - [x] establish localhost connection
-- [ ] implement capture-display pipeline
+- [x] implement capture-display pipeline
 
 ### **Coral TPU:**
  - [x] test tflite model
@@ -36,8 +38,11 @@ Python Intelligent Traffic Assistant
 
 ### **Camera:**
 - [x] test with webCam
-- [x] recording modes
+- [x] fix recording mode
+- [x] permanent recording mode
 - [x] implement distance measurment
+- [ ] smart recording mode
+- [ ] start smart recording by default
 - [ ] connect GPIO Camera
 - [ ] connect external screen
 

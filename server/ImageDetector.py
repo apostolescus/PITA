@@ -4,16 +4,21 @@ import cv2
 import os
 import csv
 import pandas as pd
+
 from shapely.geometry import Polygon
 from pycoral.adapters.common import input_size
 from pycoral.adapters.detect import get_objects
 from pycoral.utils.dataset import read_label_file
 from pycoral.utils.edgetpu import make_interpreter
 from pycoral.utils.edgetpu import run_inference
+
 import uuid
 import time
 
-class DetectedObject():
+from Storage import DetectedPipeline
+
+
+class DetectedObject:
     def __init__(self, id, score, bbox, label, color):
         self.id = id
         self.score = score
@@ -83,7 +88,7 @@ class ImageDetector:
 
     def __get_distances(self, mode, detected_list, height):
     # """ Calculates distances and checks if vehicles in front"""
-
+    
         #Done:
         #check distance only for cars in front 
 
@@ -92,7 +97,7 @@ class ImageDetector:
         #extend range for pedestrians
 
         distance_vector = {}
-        object_position = {}
+        frontal_objects = {}
         
         #polygon used for lane detection
         p1 = Polygon([(340, 150), (920, height - 550), (1570, 150)])
@@ -122,26 +127,29 @@ class ImageDetector:
                         d = self.get_distance(i.id, w, h)
                         distance_vector[d] = i.id
                         id = i.unique_id
-                        object_position[id] = 0
+                        frontal_objects[id] = 0
 
-        return distance_vector, object_position
+        return distance_vector, frontal_objects
     
     def detect(self, image):
 
         height = image.shape[0]
 
         if time.time() - self.start > 0.1:
+            detected_obj = DetectedPipeline(image)
+
             if self.mode == 0: #yolo modeld
                 detected_list = self.make_prediction(image)
 
                 if detected_list:
                     distances, frontal_list = self.__get_distances(True, detected_list, height)
-                    draw_box_parameters = (detected_list, distances, frontal_list)
-                else:
-                    draw_box_parameters = ()
+                    detected_obj.frontal_distances = distances
+                    detected_obj.frontal_objects = frontal_list
+                    detected_obj.detected_objects = detected_list
+                    detected_obj.detected = True
 
                 self.start = time.time()
-                return draw_box_parameters
+                return detected_obj
 
             else:
                 cv2_im = image

@@ -23,7 +23,7 @@ result_queue = Queue(1)
 switch = False
 
 #debug
-mode = "1"
+mode = "0"
 
 class Display(BoxLayout):
 
@@ -39,7 +39,7 @@ class Screen_One(Screen):
         Clock.schedule_interval(self.update, 1.0 / 30)
 
     def update(self, dt):
-        global captured_image_queue, result_queue, stop
+        global captured_image_queue, result_queue
         
         frame = self.capture.getFrame()
         #put image in pipeline and send it to video recorder
@@ -110,6 +110,7 @@ class Screen_Two(Screen):
     def on_spinner_select_record_type(self, text):
 
         temp_var = 0
+        print("selected text: ", text)
         if text == "Smart Mode":
             temp_var = 0
         elif text == "Permanent":
@@ -118,15 +119,14 @@ class Screen_Two(Screen):
             temp_var = 2
         else:
             temp_var = 3
-
+        
+        print("Temp var: ", temp_var)
         UISelected.rec_mode = temp_var
+        print("UISelected: ", UISelected.rec_mode)
 
     def update_settings(self):
-        
+        UISelected.updated = True
         toggle_update_message()
-        #print("Update message val is: ", update_message)
-        #print("Updating settings")
-        #pdate = True    
 
 class CameraApp(App):
 
@@ -154,19 +154,16 @@ class CameraApp(App):
       
         
     def switch_callback(self):
-        global switch, lane_detector
+        global switch
 
-        # print("Switch value: ", switch)
-        if switch is False:
-            #lane_detector = LaneDetectorThread("lane_thread")
+        if switch is False:    
             switch = True
-            #lane_detector.start()
+            UISelected.lane_detection = True
+            toggle_update_message()
         else:
-            for thread in enumerate():
-                if thread.name == "lane_thread":
-                    thread.join()
-            #lane_detector.join()
+            toggle_update_message()
             switch = False
+            UISelected.lane_detection = False
 
     def sound_callback(self):
         global switch_sound
