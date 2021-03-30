@@ -7,16 +7,16 @@ import cv2
 import copy
 import numpy as np
 
-from ImageDetector import ImageDetector, DetectedObject
-from Alerter import Alerter, Update
-from Storage import StoppableThread
-from Storage import DetectedPipeline
-
 import uuid
-import threading 
+import threading
 import time
 from datetime import datetime
 from queue import Queue, Empty
+
+from image_detector import ImageDetector, DetectedObject
+from alerter import Alerter, Update
+from storage import StoppableThread
+from storage import DetectedPipeline
 
 lane_detection = False
 
@@ -26,30 +26,29 @@ lane_detection_queue = Queue(1)
 alerter_queue = Queue(1)
 results_queue = Queue(1)
 
-#debugging
+# debugging
 debug_mode = False
 
 
 class AlertThread(StoppableThread):
-    
     def __init__(self, name):
-        
+
         super(AlertThread, self).__init__(name)
         height = 1080
-        self.alerter = Alerter([(340, height-150), (920, 550), (1570, height-150)])
-    
+        self.alerter = Alerter([(340, height - 150), (920, 550), (1570, height - 150)])
+
     def update(self, update):
-        #rint("UPDATINNNNNNG")
-        #print("update object: ", update)
+        # rint("UPDATINNNNNNG")
+        # print("update object: ", update)
         self.alerter.update(update)
 
     def run(self):
         global lane_detection_queue
-        
+
         # starts GPS thread
         # gps = GPS("GPSThread")
         # gps.start()
-        
+
         self.stop = False
 
         while not self.stopevent.isSet():
@@ -59,32 +58,32 @@ class AlertThread(StoppableThread):
             #     self.alerter.update()
             #     videoManager.update()
             #     update = False
-            
-            third_step = alerter_queue.get()
-            
-            #self.alerter.video_manager.record(image)
-            self.alerter.check_safety(third_step)
-            
 
-            #drawn_image = self.alerter.draw_image(res[0], res[1], lines)
+            third_step = alerter_queue.get()
+
+            # self.alerter.video_manager.record(image)
+            self.alerter.check_safety(third_step)
+
+            # drawn_image = self.alerter.draw_image(res[0], res[1], lines)
             results_queue.put(third_step)
 
-            
         print("Alerter stopped")
 
     def update_data(self):
         self.alerter.update_alert_logger()
 
-class ImageObjectDetectorThread(StoppableThread):
 
+class ImageObjectDetectorThread(StoppableThread):
     def run(self):
 
-        imageDetector = ImageDetector("yolo-files/yolov4-tiny.weights", "yolo-files/yolov4-tiny.cfg")
-        
-        #imageDetector = ImageDetector("yolo-files/mobilenet_ssd_v2_coco_quant_postprocess_edgetpu.tflite", "yolo-files/yolov4-tiny.cfg", model = "tflite")
+        imageDetector = ImageDetector(
+            "yolo-files/yolov4-tiny.weights", "yolo-files/yolov4-tiny.cfg"
+        )
+
+        # imageDetector = ImageDetector("yolo-files/mobilenet_ssd_v2_coco_quant_postprocess_edgetpu.tflite", "yolo-files/yolov4-tiny.cfg", model = "tflite")
 
         while True:
-            
+
             read_image = image_detection_queue.get()
 
             detection_results = imageDetector.detect(read_image)
@@ -94,9 +93,11 @@ class ImageObjectDetectorThread(StoppableThread):
                 lane_detection_queue.put(result)
             else:
                 alerter_queue.put(result)
-            
+
+
 image_thread = ImageObjectDetectorThread("image_detector").start()
 alerter_thread = AlertThread("alerter").start()
+
 
 class Message:
     def __init__(self, selector, sock, addr):
@@ -112,7 +113,7 @@ class Message:
         self._results = None
         self._waiting_images = Queue(3)
         self._detection_results = Queue(1)
-        
+
     def process_message(self, mask):
         if mask & selectors.EVENT_READ:
             self.read()
@@ -138,10 +139,8 @@ class Message:
         self.selector.modify(self.sock, events, data=self)
 
     def _json_decode(self, json_bytes, encoding="utf-8"):
-        
-        tiow = io.TextIOWrapper(
-            io.BytesIO(json_bytes), encoding=encoding, newline=""
-        )
+
+        tiow = io.TextIOWrapper(io.BytesIO(json_bytes), encoding=encoding, newline="")
         obj = json.load(tiow)
         tiow.close()
         return obj
@@ -166,7 +165,7 @@ class Message:
         if len(self._recv_buffer) >= header_len:
             self._header_len = struct.unpack("<H", self._recv_buffer[:header_len])[0]
             self._recv_buffer = self._recv_buffer[header_len:]
-    
+
     def _process_header(self):
         header_len = self._header_len
 
@@ -175,9 +174,9 @@ class Message:
             self.json_header = self._json_decode(self._recv_buffer[:header_len])
             self._recv_buffer = self._recv_buffer[header_len:]
             self._read_header = False
-    
+
     def _process_request(self):
-        
+
         request_type = self.json_header["request-type"]
 
         if request_type == "DETECT":
@@ -192,16 +191,16 @@ class Message:
 
         elif request_type == "UPDATE":
 
-            self._data = self._recv_buffer[:self._header_len]
-            self._recv_buffer = self._recv_buffer[self._header_len:]
+            self._data = self._recv_buffer[: self._header_len]
+            self._recv_buffer = self._recv_buffer[self._header_len :]
             self._read_header = True
-     
+
     def _signal_working(self):
-      
+
         self._set_selector_events_mask("w")
         header = {
-                'response-type':'SEND',
-                }
+            "response-type": "SEND",
+        }
 
         encoded_header = self._json_encode(header)
         message_hdr = struct.pack("<H", len(encoded_header))
@@ -222,7 +221,7 @@ class Message:
 
         if detected_obj:
             if detected_obj.detected:
-                
+
                 formatted_list = []
                 detected_list = detected_obj.detected_objects
 
@@ -243,47 +242,47 @@ class Message:
 
                 dictionary["detected_objects"] = formatted_list
                 dictionary["danger"] = detected_obj.danger
-             
+
         self._results = dictionary
 
     def read(self):
 
         self._read()
-        
-         #check if is image or update request
+
+        # check if is image or update request
         if self._read_header:
             self._get_header()
             self._process_header()
 
         self._process_request()
-        
+
         if self._read_header:
-            # the full message was received 
+            # the full message was received
             # process it's content
             # print("--- main thread --- Full message was received")
-            
+
             if self.json_header["request-type"] == "DETECT":
 
-                #extract image from byte stream
+                # extract image from byte stream
                 jpg_original = base64.b64decode(self._data)
                 jpg_as_np = np.frombuffer(jpg_original, dtype=np.uint8)
                 img = cv2.imdecode(jpg_as_np, flags=1)
 
-                #add image to processing queue
+                # add image to processing queue
                 image_detection_queue.put(img)
 
-                #clear reciving buffer
+                # clear reciving buffer
                 self._data = b""
 
                 self._results = results_queue.get()
 
                 if self._results:
                     self._process_results()
-               
+
                 self._set_selector_events_mask("w")
 
             elif self.json_header["request-type"] == "UPDATE":
-                
+
                 update_mode = self.json_header["update"]
 
                 if update_mode == 1:
@@ -293,14 +292,21 @@ class Message:
                     reaction_time = self.json_header["reaction_time"]
                     record_mode = self.json_header["record_mode"]
                     lane_det = self.json_header["lane"]
-                    update = Update(1, lane_det, record_mode, car_type, weather, experience,
-                     reaction_time)
+                    update = Update(
+                        1,
+                        lane_det,
+                        record_mode,
+                        car_type,
+                        weather,
+                        experience,
+                        reaction_time,
+                    )
 
                 else:
                     lane_det = self.json_header["lane"]
                     update = Update(0, lane_det)
 
-                #update local detector and alerter
+                # update local detector and alerter
                 for thread in threading.enumerate():
                     if thread.name == "alerter":
                         thread.update(update)
@@ -311,35 +317,32 @@ class Message:
     def _generate_request(self):
 
         response = self._results
-        
+
         # objects succesfully detected
         # send response
-        
-        if len(response) >=1:
+
+        if len(response) >= 1:
             encoded_response = self._json_encode(response)
             header = {
-                    'danger':0,
-                    'response-type':'DETECTED',
-                    # used for debugging 
-                    'response-id': str(uuid.uuid4()),
-                    'content-len':len(encoded_response)
-                    }
+                "danger": 0,
+                "response-type": "DETECTED",
+                # used for debugging
+                "response-id": str(uuid.uuid4()),
+                "content-len": len(encoded_response),
+            }
 
             encoded_header = self._json_encode(header)
             message_hdr = struct.pack("<H", len(encoded_header))
 
             msg = message_hdr + encoded_header + encoded_response
         else:
-            header = {
-                    'response-type':'EMPTY',
-                    'response-id': str(uuid.uuid4())
-                    }
+            header = {"response-type": "EMPTY", "response-id": str(uuid.uuid4())}
 
             encoded_header = self._json_encode(header)
             message_hdr = struct.pack("<H", len(encoded_header))
-            
+
             msg = message_hdr + encoded_header
-            
+
         self._send_buffer += msg
         self._request_done = True
 
@@ -349,12 +352,12 @@ class Message:
             try:
                 sent = self.sock.send(self._send_buffer)
                 if debug_mode:
-                    print("--- main thread --- Sended :" , sent)
+                    print("--- main thread --- Sended :", sent)
                 self._request_done = False
             except BlockingIOError:
                 pass
             else:
-                self._send_buffer = self._send_buffer[sent:] 
+                self._send_buffer = self._send_buffer[sent:]
         else:
             print("--- main thread --- No content in send buffer")
 
@@ -368,9 +371,8 @@ class Message:
         if not self._send_buffer:
             self._set_selector_events_mask("r")
 
-
     def close(self):
-       
+
         try:
             self.selector.unregister(self.sock)
         except Exception as e:

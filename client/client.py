@@ -17,15 +17,18 @@ counter = 0
 
 sel = selectors.DefaultSelector()
 
+
 def generate_start_request():
 
-    image = cv2.imread("test.jpeg")
-    encoded_image = base64.b64encode(cv2.imencode('.jpg', image)[1])
+    image = cv2.imread("detective.jpg")
+    encoded_image = base64.b64encode((cv2.imencode(".jpg", image)[1]))
     mode = "detect"
-    
+
     return dict(mode=mode, content=encoded_image)
 
+
 action = generate_start_request()
+
 
 def start_connection(request):
     addr = (HOST, PORT)
@@ -36,10 +39,11 @@ def start_connection(request):
     message = client_message.Message(sel, sock, addr, request)
     sel.register(sock, events, data=message)
 
+
 start_connection(action)
 
 try:
-    guiManager= GUIManagerThread("guiThread")
+    guiManager = GUIManagerThread("guiThread")
     guiManager.start()
 
     while True:

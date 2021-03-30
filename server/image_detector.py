@@ -15,7 +15,7 @@ from pycoral.utils.edgetpu import run_inference
 import uuid
 import time
 
-from Storage import DetectedPipeline
+from storage import DetectedPipeline
 
 
 class DetectedObject:
@@ -27,13 +27,13 @@ class DetectedObject:
         self.label = label
         self.unique_id = uuid.uuid4()
 
-    
+
 class ImageDetector:
     def __init__(
         self,
         weights,
         config_file,
-        model = "yolo",
+        model="yolo",
         labels="yolo-files/coco.names",
         average_size="yolo-files/average_size.csv",
         confidence=0.5,
@@ -48,7 +48,7 @@ class ImageDetector:
                 self.layer_names[i[0] - 1] for i in self.net.getUnconnectedOutLayers()
             ]
             self.labels = open(labels).read().strip().split("\n")
-            
+
         elif model == "tflite":
             self.interpreter = make_interpreter(weights)
             self.interpreter.allocate_tensors()
@@ -65,7 +65,7 @@ class ImageDetector:
                 id_dictionary[int(element) - 1] = line
 
         self.average_size_dictionary = id_dictionary
-       
+
         self.confidence = confidence
         self.threshold = threshold
         self.start = time.time()
@@ -73,33 +73,31 @@ class ImageDetector:
         self.colors = np.random.randint(
             0, 255, size=(len(self.labels), 3), dtype="uint8"
         )
-       
 
     # """
     #  YOLO Image Detector. Allows or both object detection and distance to object measurer.
-    #  In order to measure distance, you should load a file with the WIDTH of each possible object. 
-    #  The focal length of the sensor is required for correct distance measurement. 
+    #  In order to measure distance, you should load a file with the WIDTH of each possible object.
+    #  The focal length of the sensor is required for correct distance measurement.
     #  The algoritm uses detected object width in pixels and calculates the distance base on true width
     #  and focal length: https://www.pyimagesearch.com/2015/01/19/find-distance-camera-objectmarker-using-python-opencv/
-     
+
     #  Allows distance measurements using width or height.
     # """
 
-
     def __get_distances(self, mode, detected_list, height):
-    # """ Calculates distances and checks if vehicles in front"""
-    
-        #Done:
-        #check distance only for cars in front 
+        # """ Calculates distances and checks if vehicles in front"""
 
-        #TO DO:
-        #improve for semapthore distance estimation
-        #extend range for pedestrians
+        # Done:
+        # check distance only for cars in front
+
+        # TO DO:
+        # improve for semapthore distance estimation
+        # extend range for pedestrians
 
         distance_vector = {}
         frontal_objects = {}
-        
-        #polygon used for lane detection
+
+        # polygon used for lane detection
         p1 = Polygon([(340, 150), (920, height - 550), (1570, 150)])
 
         if detected_list:
@@ -107,13 +105,15 @@ class ImageDetector:
                 x, y = i.bbx[0], i.bbx[1]
                 w, h = i.bbx[2], i.bbx[3]
 
-                #calculate overlap area
-                car_area = w*h
-                car_area_min_val = 80/100*car_area
+                # calculate overlap area
+                car_area = w * h
+                car_area_min_val = 80 / 100 * car_area
                 y_cart = height - y - h
 
-                p2 = Polygon([(x, y_cart), (x+w, y_cart), (x+w, y_cart+h), (x, y_cart+h)])
-                
+                p2 = Polygon(
+                    [(x, y_cart), (x + w, y_cart), (x + w, y_cart + h), (x, y_cart + h)]
+                )
+
                 # if the car is in front and it is over 80% inside the riding view
                 # calculate distance and add as possible danger
 
@@ -130,7 +130,7 @@ class ImageDetector:
                         frontal_objects[id] = 0
 
         return distance_vector, frontal_objects
-    
+
     def detect(self, image):
 
         height = image.shape[0]
@@ -138,11 +138,13 @@ class ImageDetector:
         if time.time() - self.start > 0.1:
             detected_obj = DetectedPipeline(image)
 
-            if self.mode == 0: #yolo modeld
+            if self.mode == 0:  # yolo modeld
                 detected_list = self.make_prediction(image)
 
                 if detected_list:
-                    distances, frontal_list = self.__get_distances(True, detected_list, height)
+                    distances, frontal_list = self.__get_distances(
+                        True, detected_list, height
+                    )
                     detected_obj.frontal_distances = distances
                     detected_obj.frontal_objects = frontal_list
                     detected_obj.detected_objects = detected_list
@@ -156,17 +158,20 @@ class ImageDetector:
                 cv2_im_rgb = cv2.cvtColor(cv2_im, cv2.COLOR_BGR2RGB)
                 cv2_im_rgb = cv2.resize(cv2_im_rgb, self.inference_size)
                 run_inference(self.interpreter, cv2_im_rgb.tobytes())
-                objs = get_objects(self.interpreter, self.confidence)[:self.top_k]
+                objs = get_objects(self.interpreter, self.confidence)[: self.top_k]
 
                 detected_list = []
                 height, width, channels = cv2_im.shape
-                scale_x, scale_y = width / self.inference_size[0], height / self.inference_size[1]
-                #convert from object to detectedObject
+                scale_x, scale_y = (
+                    width / self.inference_size[0],
+                    height / self.inference_size[1],
+                )
+                # convert from object to detectedObject
                 for obj in objs:
-                    bbox = obj.bbox.scale(scale_x, scale_y)  
+                    bbox = obj.bbox.scale(scale_x, scale_y)
                     x0, y0 = int(bbox.xmin), int(bbox.ymin)
-                    x1, y1 = int(bbox.xmax)-x0, int(bbox.ymax)-y0
-                    bbox = [x0,y0,x1,y1] 
+                    x1, y1 = int(bbox.xmax) - x0, int(bbox.ymax) - y0
+                    bbox = [x0, y0, x1, y1]
 
                     label = self.labels[obj.id]
                     color = self.colors[obj.id]
@@ -174,17 +179,19 @@ class ImageDetector:
                     detected_list.append(detected_obj)
 
                 if detected_list:
-                    distances, frontal_list = self.__get_distances(True, detected_list, height)
+                    distances, frontal_list = self.__get_distances(
+                        True, detected_list, height
+                    )
                     draw_box_parameters = (detected_list, distances, frontal_list)
                 else:
                     draw_box_parameters = ()
-                    
+
                 self.start = time.time()
                 return draw_box_parameters
         else:
             return ()
-            #cv2_im, dictionary = self.append_objs_to_img(cv2_im, self.inference_size, objs, self.labels)
-        
+            # cv2_im, dictionary = self.append_objs_to_img(cv2_im, self.inference_size, objs, self.labels)
+
     def extract_boxes_confidences_classids(self, outputs, width, height):
         boxes = []
         confidences = []
@@ -212,7 +219,7 @@ class ImageDetector:
                     classIDs.append(classID)
 
         return boxes, confidences, classIDs
-    
+
     def append_objs_to_img(self, cv2_im, inference_size, objs, labels):
 
         height, width, channels = cv2_im.shape
@@ -221,18 +228,25 @@ class ImageDetector:
 
         for obj in objs:
             bbox = obj.bbox.scale(scale_x, scale_y)
-            
+
             x0, y0 = int(bbox.xmin), int(bbox.ymin)
             x1, y1 = int(bbox.xmax), int(bbox.ymax)
 
             index = labels.get(obj.id, obj.id)
 
             percent = int(100 * obj.score)
-            label = '{}% {}'.format(percent, self.labels.get(obj.id, obj.id))
+            label = "{}% {}".format(percent, self.labels.get(obj.id, obj.id))
 
             cv2_im = cv2.rectangle(cv2_im, (x0, y0), (x1, y1), (0, 255, 0), 2)
-            cv2_im = cv2.putText(cv2_im, label, (x0, y0+30),
-                                cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 0, 0), 2)
+            cv2_im = cv2.putText(
+                cv2_im,
+                label,
+                (x0, y0 + 30),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                1.0,
+                (255, 0, 0),
+                2,
+            )
 
         return cv2_im, distance_vector
 
@@ -242,7 +256,6 @@ class ImageDetector:
     #     Allows for both width or heigh distance measurements.
     #     """
     #     distance_vector = {}
-       
 
     #     if len(idxs) > 0:
     #         for i in idxs.flatten():
@@ -281,24 +294,26 @@ class ImageDetector:
         )
 
         # Apply Non-Max Suppression
-        
+
         idxs = cv2.dnn.NMSBoxes(boxes, confidences, self.confidence, self.threshold)
         detected_objects = []
 
         if len(idxs) > 0:
             for i in idxs.flatten():
-            
+
                 label = self.labels[classIDs[i]]
-                #print("detected: ", label)
+                # print("detected: ", label)
                 color = [int(c) for c in self.colors[classIDs[i]]]
-                detected_object = DetectedObject(classIDs[i], confidences[i], boxes[i], label, color)
+                detected_object = DetectedObject(
+                    classIDs[i], confidences[i], boxes[i], label, color
+                )
                 detected_objects.append(detected_object)
 
         return detected_objects
-        #return boxes, confidences, classIDs, idxs, uniqueIDs
+        # return boxes, confidences, classIDs, idxs, uniqueIDs
 
     def get_distance(self, item_id, width, height, focal_length=596):
-        
+
         mode = int(self.average_size_dictionary[item_id][0])
         value = self.average_size_dictionary[item_id][1]
         denominator = 0
@@ -318,7 +333,7 @@ class ImageDetector:
 
         d = focal_length * float(value) / int(denominator)
 
-        return d/100 # convert from m to cm
+        return d / 100  # convert from m to cm
 
 
 def test():

@@ -1,15 +1,15 @@
-from VideoManager import VideoManagerSingleton
-from Storage import RecordStorage
+from video_manager import VideoManagerSingleton
+from storage import RecordStorage
 import threading
 import cv2
 
 
 class VideoManagerWrapper:
     """
-	Singleton thread safe VideoManager wrapper.
+        Singleton thread safe VideoManager wrapper.
     Mediates acces between GUI, other threads and low level VideoManager.
     Use getInstance() method.
-	"""
+    """
 
     __instance = None
 
@@ -31,25 +31,21 @@ class VideoManagerWrapper:
 
     def record(self, frame):
         self.safe_enter()
-        try:
-            # print("Record Storage recording: ", RecordStorage.recording)
-            # print("Record Mode: ", RecordStorage.mode)
-            # if it is suposed to rec
-            if RecordStorage.recording:
-                # if smart mode is enable
-                if RecordStorage.mode == 0:
-                    # and objcect is detected close enough
-                    if RecordStorage.start_smart:
-                        self.vm.record(frame, True)
-                # if permanent mode enable
-                elif RecordStorage.mode == 1:
-                    print("Recording permanent mode")
+
+        # if it is suposed to rec
+        if RecordStorage.recording:
+            # if smart mode is enable
+            if RecordStorage.mode == 0:
+                # and objcect is detected close enough
+                if RecordStorage.start_smart:
                     self.vm.record(frame, True)
-                # if fix size mode enable
-                elif RecordStorage.mode == 2:
-                    self.vm.record(frame, False)
-        except Exception as e:
-            print("EXCEPTIOOON: ", e)
+            # if permanent mode enable
+            elif RecordStorage.mode == 1:
+                self.vm.record(frame, True)
+            # if fix size mode enable
+            elif RecordStorage.mode == 2:
+                self.vm.record(frame, False)
+
         self.safe_exit()
 
     def start(self):
@@ -86,14 +82,14 @@ class VideoManagerWrapper:
 
         self.safe_enter()
         RecordStorage.start_smart = True
-        #elf.start_rec = True
+        # elf.start_rec = True
         self.safe_exit()
 
     def stop_smart(self):
 
         self.safe_enter()
         RecordStorage.start_smart = False
-        #self.start_rec = False
+        # self.start_rec = False
         self.safe_exit()
 
     def update(self):
@@ -107,6 +103,7 @@ class VideoManagerWrapper:
         self.fixed = RecordStorage.fix
 
         self.safe_exit()
+
 
 def test():
     camera = cv2.VideoCapture(0)
@@ -124,5 +121,6 @@ def test():
 
     videoWrapper.stop()
     camera.release()
+
 
 # test()

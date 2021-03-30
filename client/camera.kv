@@ -145,33 +145,7 @@
                 Switch:
                     id: switch
                     on_active: app.switch_callback()
-            BoxLayout:
-                orientation: 'vertical'
-                
-                Label:
-                    text:'Video Manager'
-                    font_size: 20
-                    font_name: font_bold
 
-                BoxLayout: 
-                    orientation:'horizontal'
-                    padding:5
-                    #spacing:10
-
-                    Button:
-                        text: 'Start'
-                        font_name: font_regular
-                        background_normal: ''
-                        background_color:  rgba(secondary_bg_color)
-                        font_size: 17
-                        on_release: app.start_vid()
-                    Button: 
-                        text: 'Stop'
-                        font_name: font_regular
-                        background_normal: ''
-                        background_color:  rgba(highlight)
-                        font_size: 17
-                        on_release: app.stop_vid()
             BoxLayout:
                 orientation: 'vertical'
                 spacing:10

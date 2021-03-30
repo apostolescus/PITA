@@ -6,14 +6,14 @@ from datetime import datetime
 
 class VideoManagerSingleton:
 
-	# '''
-	# Singleton class manages low level image operations.
-	# Used with a wrapper above.
-	# time : by default 180 secs
-	# mu : False if time is in seconds, else True
-	# frame_size : modify depending on the camera
-	# FPS : modify depending on the frame size you obtain after camera processing 
-	# '''
+    # '''
+    # Singleton class manages low level image operations.
+    # Used with a wrapper above.
+    # time : by default 180 secs
+    # mu : False if time is in seconds, else True
+    # frame_size : modify depending on the camera
+    # FPS : modify depending on the frame size you obtain after camera processing
+    # '''
 
     __instance = None
 
@@ -50,7 +50,7 @@ class VideoManagerSingleton:
         self.counter = 0
         self.check = False
         self.frame_size = frame_size
-        
+
         VideoManagerSingleton.__instance = self
 
     def set_name(self):
@@ -82,7 +82,7 @@ class VideoManagerSingleton:
             print("Exception in record: ", e)
 
     def save(self, long=False):
-      
+
         if long is False:
             if self.check is False:
                 for i in range(0, self.counter):
@@ -95,13 +95,10 @@ class VideoManagerSingleton:
                     self.writer.write(self.buffer[i])
 
         self.writer.release()
-        
-           
-     
 
 
 def test():
-	
+
     camera = cv2.VideoCapture(0)
     videoManager = VideoManagerSingleton.getInstance()
 
@@ -110,7 +107,7 @@ def test():
 
     while counter != 100:
         ret, frame = camera.read()
-       
+
         videoManager.record(frame, long=True)
         counter += 1
 

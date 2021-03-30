@@ -1,12 +1,14 @@
 # from globals import get_speed, record_mode, switch_sound
-from Storage import DetectedPipeline
-from Storage import get_car_by_index, get_driver_level_by_index
-from Storage import get_weather_by_index
-from Storage import FrictionCoefficient, Constants, UISelected, RecordStorage
+from storage import DetectedPipeline
+from storage import get_car_by_index, get_driver_level_by_index
+from storage import get_weather_by_index
+from storage import FrictionCoefficient, Constants, UISelected, RecordStorage
+
 # from VideoManager import VideoManagerSingleton
-from VideoManagerWrapper import VideoManagerWrapper
+from video_manager_wrapper import VideoManagerWrapper
+
 # from globals import RecordStorage, start_rec
-from AlertLogger import AlerterLogger
+from alert_logger import AlerterLogger
 import logging
 import numpy as np
 import time
@@ -14,10 +16,18 @@ import threading
 import cv2
 from playsound import playsound
 
-class Update:
 
-    def __init__(self, mode, lane, record_mode = None,
-     car_type = None, weather = None, experience = None, reaction_time = None):
+class Update:
+    def __init__(
+        self,
+        mode,
+        lane,
+        record_mode=None,
+        car_type=None,
+        weather=None,
+        experience=None,
+        reaction_time=None,
+    ):
 
         self.mode = mode
 
@@ -29,10 +39,11 @@ class Update:
             self.record_mode = record_mode
 
         self.lane = lane
-        
- 
+
+
 def play_sound():
     playsound("alert_sounds/beep.mp3")
+
 
 class Alerter:
     def __init__(
@@ -44,7 +55,7 @@ class Alerter:
     ):
         friction_coef = "FrictionCoefficient." + car_type + "." + weather_type
         friction_coef = eval(friction_coef)
-        
+
         self.video_manager = VideoManagerWrapper.getInstance()
         self.multiply = FrictionCoefficient.formula.multiplier / friction_coef
         self.reaction_time = reaction_time * Constants.km_to_h
@@ -55,9 +66,9 @@ class Alerter:
         self.danger_area = danger_area
         self.last_detected = None
         self.alert_logger = AlerterLogger()
-        
+
     def update(self, update):
-        
+
         print("Updating object: ", update)
         mode = update.mode
 
@@ -73,10 +84,10 @@ class Alerter:
             self.reaction_time = reaction * Constants.km_to_h
 
             record_mode = update.record_mode
-            
+
             if RecordStorage.mode != record_mode:
                 if RecordStorage.recording:
-                    #save current video
+                    # save current video
                     print("Already recording...")
                     self.video_manager.stop()
 
@@ -85,19 +96,18 @@ class Alerter:
                     RecordStorage.mode = record_mode
                     self.video_manager.start()
 
-                
         # process record
         lane_det = update.lane
         print("DATA SUCCESSFULLY UPDATED")
-    
+
     def draw_image(self, image, detected_bbx, lines=None):
-        #height = image.shape[0]
+        # height = image.shape[0]
 
         # pts = np.array([[(340, height-150), (920, 550), (1570, height-150)]],
-        #        np.int32) 
+        #        np.int32)
 
-        if len(detected_bbx) != 0 :
-            
+        if len(detected_bbx) != 0:
+
             detected_objects = detected_bbx[1]
             labels = detected_bbx[2]
             colors = detected_bbx[3]
@@ -109,32 +119,34 @@ class Alerter:
             # self.labels = labels
 
             for obj in detected_objects:
-                x,y = obj.bbx[0], obj.bbx[1]
-                w,h = obj.bbx[2], obj.bbx[3]
+                x, y = obj.bbx[0], obj.bbx[1]
+                w, h = obj.bbx[2], obj.bbx[3]
 
                 color = [int(c) for c in colors[obj.id]]
                 cv2.rectangle(image, (x, y), (x + w, y + h), color, 3)
 
                 text = "{}: {:.4f}".format(labels[obj.id], obj.score)
-                cv2.putText(image, text, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+                cv2.putText(
+                    image, text, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2
+                )
         else:
             if self.last_detected:
                 for obj in self.last_detected:
-                    x,y = obj.bbx[0], obj.bbx[1]
-                    w,h = obj.bbx[2], obj.bbx[3]
+                    x, y = obj.bbx[0], obj.bbx[1]
+                    w, h = obj.bbx[2], obj.bbx[3]
 
-                    #color = [int(c) for c in self.colors[obj.id]]
-                    cv2.rectangle(image, (x, y), (x + w, y + h), (255,0,0), 3)
+                    # color = [int(c) for c in self.colors[obj.id]]
+                    cv2.rectangle(image, (x, y), (x + w, y + h), (255, 0, 0), 3)
 
                     # text = "{}: {:.4f}".format(self.labels[obj.id], obj.score)
                     # cv2.putText(image, text, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
-           
+
         if lines is not None:
-            image = cv2.addWeighted(image, 1, lines, 0.5,1)
+            image = cv2.addWeighted(image, 1, lines, 0.5, 1)
         return image
 
     def check_safety(self, detected_result):
-        
+
         safe = True
         self.video_manager.record(detected_result[0])
         detected_results = detected_result[1]
@@ -145,35 +157,35 @@ class Alerter:
             if detected:
                 distances = detected_results.frontal_distances
 
-                if len(distances) >=1 :
+                if len(distances) >= 1:
                     dictionary = distances.items()
                     sorted_distances = sorted(dictionary)
 
                     speed = 140
 
                     max_distance = self._calculate_max_distance(speed)
-                
+
                     for i in sorted_distances:
                         if max_distance > i[0]:
                             safe = False
-                            
-                            #self.alert_logger.add_data(speed, i, time.time(), True)
+
+                            # self.alert_logger.add_data(speed, i, time.time(), True)
 
                             detected_results.danger = 1
-                            #start smart recording
+                            # start smart recording
 
                             if self.recording is False:
                                 self.recording = True
 
                             # make warning sound
-                            
+
                             return True
 
                             # if sound:
                             #     t = threading.Thread(target=play_sound)
                             #     t.start()
 
-                            #if smart mode start recording
+                            # if smart mode start recording
                             # if RecordStorage.smart is True and self.started is False:
                             #     #print("started smart recording")
                             #     self.videManager.start_smart()
@@ -182,7 +194,7 @@ class Alerter:
                         # else:
                         #     self.alert_logger.add_data(speed, i, time.time(), False)
 
-                    #if now in safe state and in smart mode stop recording
+                    # if now in safe state and in smart mode stop recording
                     # if safe is True and RecordStorage.smart is True and self.started is True:
                     #     print("stopping smart recording")
                     #     self.videManager.stop_smart()
@@ -198,7 +210,8 @@ class Alerter:
 
     def update_alert_logger(self):
         self.alert_logger.upload_data()
-        
+
+
 # def test():
 #     alert = Alerter()
 

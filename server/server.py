@@ -15,6 +15,7 @@ listen_socket.listen()
 listen_socket.setblocking(False)
 selector.register(listen_socket, selectors.EVENT_READ, data=None)
 
+
 def add_connection(sock):
 
     conn, addr = sock.accept()
@@ -22,10 +23,11 @@ def add_connection(sock):
     message = server_message.Message(selector, conn, addr)
     selector.register(conn, selectors.EVENT_READ, message)
 
+
 try:
     while True:
         event = selector.select(timeout=None)
-    
+
         for key, mask in event:
             if key.data is None:
                 add_connection(key.fileobj)
@@ -39,9 +41,8 @@ try:
                         f"{message.addr}:\n{traceback.format_exc()}",
                     )
                     message.close()
-                    
+
 except KeyboardInterrupt:
     print("caught keyboard interrupt, exiting")
 finally:
     selector.close()
- 
