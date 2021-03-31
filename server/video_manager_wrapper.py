@@ -38,6 +38,7 @@ class VideoManagerWrapper:
             if RecordStorage.mode == 0:
                 # and objcect is detected close enough
                 if RecordStorage.start_smart:
+                    print("Smart Recording")
                     self.vm.record(frame, True)
             # if permanent mode enable
             elif RecordStorage.mode == 1:
@@ -71,9 +72,10 @@ class VideoManagerWrapper:
             check = True
         print("Check is: ", check)
         # start a new thread to save the video
-        # save_thread = threading.Thread(target=self.vm.save, args=(check,))
-        # save_thread.start()
-        self.vm.save(check)
+        save_thread = threading.Thread(target=self.vm.save, args=(check,))
+        save_thread.start()
+
+        #self.vm.save(check)
 
         print("Saved finished")
         self.safe_exit()

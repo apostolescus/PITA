@@ -3,28 +3,30 @@ import json
 import sys
 import struct
 import io
-
+import numpy as np
+from threading import Thread
 import cv2
 import base64
 import uuid
+from playsound import playsound
 
 # import locals
 from screen_manager import captured_image_queue, result_queue
 from storage import toggle_update_message, get_update_message
-from storage import UISelected
+from storage import UISelected, get_switch_sound
 
 # debugg
 counter = 0
+start = False
 max_val = 10000
 mute = True
 
 
 class Message:
-    def __init__(self, selector, sock, addr, request):
+    def __init__(self, selector, sock, addr):
         self.selector = selector
         self.sock = sock
         self.addr = addr
-        self._request = request
         self._request_done = False
         self._read_header = True
         self._send_buffer = b""
@@ -66,8 +68,10 @@ class Message:
         self.selector.modify(self.sock, events, data=self)
 
     def _generate_request(self):
+        global start
 
         msg = ""
+
         if get_update_message():
             # send update message
             toggle_update_message()
@@ -92,6 +96,7 @@ class Message:
                     "update": 0,
                     "lane": UISelected.lane_detection,
                 }
+
             encoded_header = self._json_encode(header)
             message_hdr = struct.pack("<H", len(encoded_header))
             msg = message_hdr + encoded_header
@@ -99,14 +104,23 @@ class Message:
         else:
             self._current_image = captured_image_queue.get()
 
+            if start is False:
+                height = self._current_image.shape[0]
+                width = self._current_image.shape[1]
+
+                print("Polygon coordinates: ")
+                print(width - 530, height - (height - 50))
+                print(width / 2 - 15, height - (200))
+                print(width - 120, height - (height - 50))
+                start = True
+
             content = base64.b64encode(cv2.imencode(".jpg", self._current_image)[1])
 
             header = {
                 "request-type": "DETECT",
                 "content-len": len(content),
-                "encode-type": "base64",
-                "request-id": str(uuid.uuid4()),
             }
+
             if not mute:
                 print("Request id: ", header["request-id"])
 
@@ -160,16 +174,12 @@ class Message:
 
         if len(self._recv_buffer) >= header_len:
             self.json_header = self._json_decode(self._recv_buffer[:header_len])
-            # print("--json header --- ", self.json_header)
             self._recv_buffer = self._recv_buffer[header_len:]
-            # print("Json header: ", self.json_header)
+
 
     def _process_request(self):
 
         json_type = self.json_header["response-type"]
-
-        if not mute:
-            print("JSON type", json_type)
 
         if json_type == "EMPTY":
             self._read_header = True
@@ -180,27 +190,45 @@ class Message:
         elif json_type == "DETECTED":
             self._request_done = False
             content_len = self.json_header["content-len"]
+
             if len(self._recv_buffer) >= content_len:
-                self._read_header = True
+
                 data = self._recv_buffer[:content_len]
+
                 self._recv_buffer = self._recv_buffer[content_len:]
-                # print("String is: ", str(data))
+                self._read_header = True
+
                 decoded_response = self._json_decode(data)
 
                 self._display_image(decoded_response)
-                # print("Response is: ", decoded_response)
                 self._set_selector_events_mask("w")
 
         result_queue.put(self._current_image)
 
     def _display_image(self, response):
 
-        # decoded_json = json.loads(decoded_response)
 
         obj_list = response["detected_objects"]
         danger = response["danger"]
 
-        # ("Danger is: ", danger)
+        switch_sound = get_switch_sound()
+        if danger == 1 and switch_sound:
+            t = Thread(target=play_sound)
+            t.start()
+
+        height = self._current_image.shape[0]
+        width = self._current_image.shape[1]
+
+        pts = np.array(
+            [
+                [
+                    (width - 530, height - 50),
+                    (width / 2 - 15, 200),
+                    (width - 120, height - 50),
+                ]
+            ],
+            np.int32,
+        )
 
         for obj in obj_list:
             x, y = obj["coordinates"][0], obj["coordinates"][1]
@@ -218,6 +246,8 @@ class Message:
             )
 
             self._current_image = image
+
+        cv2.polylines(self._current_image, pts, True, (0, 255, 255), 2)
 
     def _read(self):
 
@@ -261,3 +291,6 @@ class Message:
         finally:
             # Delete reference to socket object for garbage collection
             self.sock = None
+
+def play_sound():
+    playsound("alert_sounds/beep.mp3")

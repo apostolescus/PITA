@@ -14,6 +14,7 @@ import cv2
 from camera_manager import CameraManagerSingleton
 from storage import UISelected, StoppableThread
 from storage import toggle_update_message, get_update_message
+from storage import toggle_switch_sound
 
 # Queues for pipeline
 captured_image_queue = Queue(1)
@@ -153,12 +154,7 @@ class CameraApp(App):
             UISelected.lane_detection = False
 
     def sound_callback(self):
-        global switch_sound
-
-        if switch_sound is False:
-            switch_sound = True
-        else:
-            switch_sound = False
+       toggle_switch_sound()
 
     def update_data(self):
         for thread in enumerate():

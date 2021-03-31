@@ -20,7 +20,6 @@ from storage import DetectedPipeline
 
 lane_detection = False
 
-# waiting_image_queue = Queue(1)
 image_detection_queue = Queue(1)
 lane_detection_queue = Queue(1)
 alerter_queue = Queue(1)
@@ -38,8 +37,6 @@ class AlertThread(StoppableThread):
         self.alerter = Alerter([(340, height - 150), (920, 550), (1570, height - 150)])
 
     def update(self, update):
-        # rint("UPDATINNNNNNG")
-        # print("update object: ", update)
         self.alerter.update(update)
 
     def run(self):
@@ -53,21 +50,15 @@ class AlertThread(StoppableThread):
 
         while not self.stopevent.isSet():
 
-            # if update is True:
-            #     videoManager.stop()
-            #     self.alerter.update()
-            #     videoManager.update()
-            #     update = False
-
             third_step = alerter_queue.get()
 
             # self.alerter.video_manager.record(image)
+            self.alerter.video_manager.record(third_step[0])
             self.alerter.check_safety(third_step)
 
             # drawn_image = self.alerter.draw_image(res[0], res[1], lines)
             results_queue.put(third_step)
 
-        print("Alerter stopped")
 
     def update_data(self):
         self.alerter.update_alert_logger()
@@ -186,7 +177,6 @@ class Message:
 
                 self._data = self._recv_buffer[:content_len]
                 self._recv_buffer = self._recv_buffer[content_len:]
-
                 self._read_header = True
 
         elif request_type == "UPDATE":
@@ -194,25 +184,6 @@ class Message:
             self._data = self._recv_buffer[: self._header_len]
             self._recv_buffer = self._recv_buffer[self._header_len :]
             self._read_header = True
-
-    def _signal_working(self):
-
-        self._set_selector_events_mask("w")
-        header = {
-            "response-type": "SEND",
-        }
-
-        encoded_header = self._json_encode(header)
-        message_hdr = struct.pack("<H", len(encoded_header))
-
-        msg = message_hdr + encoded_header
-
-        self._send_buffer += msg
-        self._request_done = True
-
-        self._write()
-        self._read_header = True
-        self._set_selector_events_mask("r")
 
     def _process_results(self):
 
@@ -259,7 +230,6 @@ class Message:
         if self._read_header:
             # the full message was received
             # process it's content
-            # print("--- main thread --- Full message was received")
 
             if self.json_header["request-type"] == "DETECT":
 
@@ -286,6 +256,7 @@ class Message:
                 update_mode = self.json_header["update"]
 
                 if update_mode == 1:
+                    # proceed to full update
                     car_type = self.json_header["car_type"]
                     weather = self.json_header["weather"]
                     experience = self.json_header["experience"]
@@ -303,6 +274,7 @@ class Message:
                     )
 
                 else:
+                    # only lane updater was switched
                     lane_det = self.json_header["lane"]
                     update = Update(0, lane_det)
 
@@ -317,31 +289,26 @@ class Message:
     def _generate_request(self):
 
         response = self._results
-
+        encoded_response = b""
         # objects succesfully detected
         # send response
 
         if len(response) >= 1:
             encoded_response = self._json_encode(response)
             header = {
-                "danger": 0,
                 "response-type": "DETECTED",
-                # used for debugging
-                "response-id": str(uuid.uuid4()),
-                "content-len": len(encoded_response),
+                "content-len":len(encoded_response)
             }
-
-            encoded_header = self._json_encode(header)
-            message_hdr = struct.pack("<H", len(encoded_header))
-
-            msg = message_hdr + encoded_header + encoded_response
+           
         else:
-            header = {"response-type": "EMPTY", "response-id": str(uuid.uuid4())}
+            header = {
+                "response-type": "EMPTY",
+                }
 
-            encoded_header = self._json_encode(header)
-            message_hdr = struct.pack("<H", len(encoded_header))
+        encoded_header = self._json_encode(header)
+        message_hdr = struct.pack("<H", len(encoded_header))
 
-            msg = message_hdr + encoded_header
+        msg = message_hdr + encoded_header + encoded_response
 
         self._send_buffer += msg
         self._request_done = True

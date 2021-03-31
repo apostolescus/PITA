@@ -7,40 +7,29 @@ import base64
 
 from screen_manager import GUIManagerThread
 from screen_manager import captured_image_queue, result_queue
+from storage import toggle_update_message
 
 import client_message
 
 HOST = "127.0.0.1"
 PORT = 65432
 
-counter = 0
 
 sel = selectors.DefaultSelector()
 
 
-def generate_start_request():
-
-    image = cv2.imread("detective.jpg")
-    encoded_image = base64.b64encode((cv2.imencode(".jpg", image)[1]))
-    mode = "detect"
-
-    return dict(mode=mode, content=encoded_image)
-
-
-action = generate_start_request()
-
-
-def start_connection(request):
+def start_connection():
+    toggle_update_message()
     addr = (HOST, PORT)
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.setblocking(False)
     sock.connect_ex(addr)
     events = selectors.EVENT_READ | selectors.EVENT_WRITE
-    message = client_message.Message(sel, sock, addr, request)
+    message = client_message.Message(sel, sock, addr)
     sel.register(sock, events, data=message)
 
 
-start_connection(action)
+start_connection()
 
 try:
     guiManager = GUIManagerThread("guiThread")

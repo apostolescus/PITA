@@ -12,7 +12,7 @@ class CameraManagerSingleton:
         if CameraManagerSingleton.__instance == None:
             CameraManagerSingleton(mode, path)
         return CameraManagerSingleton.__instance
-    
+
     def __init__(self, mode, path):
         if mode == "1":
             self.camera = cv2.VideoCapture(0)
@@ -21,7 +21,7 @@ class CameraManagerSingleton:
         CameraManagerSingleton.__instance = self
 
     def getFrame(self):
-        
+
         ret, frame = self.camera.read()
 
         frame_shape = frame.shape
@@ -33,22 +33,22 @@ class CameraManagerSingleton:
             else:
                 self.frame = frame
             return self.frame
-        
 
     def closeCamera(self):
         self.camera.release()
-    
-    def show(self, image = None):
+
+    def show(self, image=None):
         if image is None:
             cv2.imshow("image", self.frame)
         else:
             cv2.imshow("img", image)
 
+
 def Test_CamManagerVideoRec():
     camManager = CameraManagerSingleton.getInstance()
     vidManager = VideoManagerSingleton.getInstance()
     counter = 0
-    
+
     while counter != 200:
         frame = camManager.getFrame()
         vidManager.record(frame, True)
@@ -58,12 +58,13 @@ def Test_CamManagerVideoRec():
     anotherVideo.save(True)
     camManager.closeCamera()
 
+
 def Test_CamManagerWrapper():
 
     camManager = CameraManagerSingleton.getInstance()
     wrapper = VideoManagerWrapper()
     counter = 0
-    
+
     wrapper.start()
 
     while counter != 200:
@@ -74,6 +75,6 @@ def Test_CamManagerWrapper():
     wrapper.stop()
     camManager.closeCamera()
 
-#Test_CamManagerWrapper()
-#Test_CamManagerVideoRec()
 
+# Test_CamManagerWrapper()
+# Test_CamManagerVideoRec()

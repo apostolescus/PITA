@@ -63,23 +63,20 @@ class VideoManagerSingleton:
         )
 
     def record(self, frame, long=False):
-        try:
-            print("Len is: ", len(frame))
-            if self.buffer is None:
-                self.buffer = [frame] * self.buffer_len
+      
+        if self.buffer is None:
+            self.buffer = [frame] * self.buffer_len
 
-            if long is False:
-                self.buffer[self.counter] = frame
-                self.counter += 1
+        if long is False:
+            self.buffer[self.counter] = frame
+            self.counter += 1
 
-                if self.counter == self.buffer_len:
-                    self.counter = 0
-                    self.check = True
-            else:
-                print("writer: ", self.writer)
-                self.writer.write(frame)
-        except Exception as e:
-            print("Exception in record: ", e)
+            if self.counter == self.buffer_len:
+                self.counter = 0
+                self.check = True
+        else:
+            self.writer.write(frame)
+      
 
     def save(self, long=False):
 

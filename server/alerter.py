@@ -14,7 +14,6 @@ import numpy as np
 import time
 import threading
 import cv2
-from playsound import playsound
 
 
 class Update:
@@ -40,11 +39,6 @@ class Update:
 
         self.lane = lane
 
-
-def play_sound():
-    playsound("alert_sounds/beep.mp3")
-
-
 class Alerter:
     def __init__(
         self,
@@ -69,10 +63,10 @@ class Alerter:
 
     def update(self, update):
 
-        print("Updating object: ", update)
         mode = update.mode
 
         if mode == 1:
+            print("Full update mode")
             car_type = get_car_by_index(update.car_type)
             weather_type = get_weather_by_index(update.weather)
             reaction = update.reaction_time + update.experience
@@ -85,7 +79,7 @@ class Alerter:
 
             record_mode = update.record_mode
 
-            if RecordStorage.mode != record_mode:
+            if RecordStorage.mode != record_mode or RecordStorage.recording is False:
                 if RecordStorage.recording:
                     # save current video
                     print("Already recording...")
@@ -148,7 +142,7 @@ class Alerter:
     def check_safety(self, detected_result):
 
         safe = True
-        self.video_manager.record(detected_result[0])
+        # self.video_manager.record(detected_result[0])
         detected_results = detected_result[1]
 
         if detected_results:
@@ -161,7 +155,8 @@ class Alerter:
                     dictionary = distances.items()
                     sorted_distances = sorted(dictionary)
 
-                    speed = 140
+                    # get speed from GPS
+                    speed = 220
 
                     max_distance = self._calculate_max_distance(speed)
 
@@ -170,35 +165,22 @@ class Alerter:
                             safe = False
 
                             # self.alert_logger.add_data(speed, i, time.time(), True)
-
+                            print("Danger, more than 80% precent overlaping")
                             detected_results.danger = 1
                             # start smart recording
 
-                            if self.recording is False:
-                                self.recording = True
+                            if not RecordStorage.start_smart:
+                                RecordStorage.start_smart = True
 
                             # make warning sound
 
                             return True
 
-                            # if sound:
-                            #     t = threading.Thread(target=play_sound)
-                            #     t.start()
-
-                            # if smart mode start recording
-                            # if RecordStorage.smart is True and self.started is False:
-                            #     #print("started smart recording")
-                            #     self.videManager.start_smart()
-                            #     self.started = True
-
-                        # else:
-                        #     self.alert_logger.add_data(speed, i, time.time(), False)
+                            # 
 
                     # if now in safe state and in smart mode stop recording
-                    # if safe is True and RecordStorage.smart is True and self.started is True:
-                    #     print("stopping smart recording")
-                    #     self.videManager.stop_smart()
-                    #     self.started = False
+        if safe and RecordStorage.start_smart:
+            RecordStorage.start_smart = False
 
     def _calculate_max_distance(self, speed):
         # speed is in km/h

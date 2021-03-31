@@ -84,7 +84,7 @@ class ImageDetector:
     #  Allows distance measurements using width or height.
     # """
 
-    def __get_distances(self, mode, detected_list, height):
+    def __get_distances(self, mode, detected_list, height, width):
         # """ Calculates distances and checks if vehicles in front"""
 
         # Done:
@@ -98,13 +98,20 @@ class ImageDetector:
         frontal_objects = {}
 
         # polygon used for lane detection
-        p1 = Polygon([(340, 150), (920, height - 550), (1570, 150)])
+        # p1 = Polygon([(340, 150), (920, height - 550), (1570, 150)])
+        p1 = Polygon(
+            [
+                (width - 530, height - (height - 50)),
+                (width / 2 - 15, height - 200),
+                (width - 120, height - (height - 50)),
+            ]
+        )
 
         if detected_list:
             for i in detected_list:
                 x, y = i.bbx[0], i.bbx[1]
                 w, h = i.bbx[2], i.bbx[3]
-
+                # print("X: " + str(x) + " Y: " +str(y) + " W: " + str(w) + " H: " + str(h))
                 # calculate overlap area
                 car_area = w * h
                 car_area_min_val = 80 / 100 * car_area
@@ -113,6 +120,11 @@ class ImageDetector:
                 p2 = Polygon(
                     [(x, y_cart), (x + w, y_cart), (x + w, y_cart + h), (x, y_cart + h)]
                 )
+                # print("Second polygone coordinates: ")
+                # print(x, y_cart)
+                # print(x+w, y_cart)
+                # print(x+w, y_cart +h)
+                # print(x, y_cart +h)
 
                 # if the car is in front and it is over 80% inside the riding view
                 # calculate distance and add as possible danger
@@ -121,7 +133,7 @@ class ImageDetector:
 
                 if intersection:
                     intersection_area = p2.intersection(p1).area
-
+                    print("Overlap procent: ", intersection_area / car_area)
                     if intersection_area >= car_area_min_val:
                         print("more than 80% in the interesting zone")
                         d = self.get_distance(i.id, w, h)
@@ -134,6 +146,7 @@ class ImageDetector:
     def detect(self, image):
 
         height = image.shape[0]
+        width = image.shape[1]
 
         if time.time() - self.start > 0.1:
             detected_obj = DetectedPipeline(image)
@@ -143,7 +156,7 @@ class ImageDetector:
 
                 if detected_list:
                     distances, frontal_list = self.__get_distances(
-                        True, detected_list, height
+                        True, detected_list, height, width
                     )
                     detected_obj.frontal_distances = distances
                     detected_obj.frontal_objects = frontal_list
