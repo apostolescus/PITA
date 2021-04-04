@@ -6,16 +6,17 @@ import csv
 import pandas as pd
 
 from shapely.geometry import Polygon
-from pycoral.adapters.common import input_size
-from pycoral.adapters.detect import get_objects
-from pycoral.utils.dataset import read_label_file
-from pycoral.utils.edgetpu import make_interpreter
-from pycoral.utils.edgetpu import run_inference
+# from pycoral.adapters.common import input_size
+# from pycoral.adapters.detect import get_objects
+# from pycoral.utils.dataset import read_label_file
+# from pycoral.utils.edgetpu import make_interpreter
+# from pycoral.utils.edgetpu import run_inference
 
 import uuid
 import time
 
 from storage import DetectedPipeline
+from storage import get_polygone
 
 
 class DetectedObject:
@@ -33,29 +34,26 @@ class ImageDetector:
         self,
         weights,
         config_file,
-        model="yolo",
         labels="yolo-files/coco.names",
         average_size="yolo-files/average_size.csv",
         confidence=0.5,
         threshold=0.3,
     ):
 
-        if model == "yolo":
-            self.mode = 0
-            self.net = cv2.dnn.readNetFromDarknet(config_file, weights)
-            self.layer_names = self.net.getLayerNames()
-            self.layer_names = [
-                self.layer_names[i[0] - 1] for i in self.net.getUnconnectedOutLayers()
-            ]
-            self.labels = open(labels).read().strip().split("\n")
 
-        elif model == "tflite":
-            self.interpreter = make_interpreter(weights)
-            self.interpreter.allocate_tensors()
-            self.inference_size = input_size(self.interpreter)
-            self.mode = 1
-            self.top_k = 5
-            self.labels = read_label_file(labels)
+        self.mode = 0
+        self.net = cv2.dnn.readNetFromDarknet(config_file, weights)
+        try:
+            self.net.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
+            self.net.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)
+        except:
+            print("No GPU found")
+
+        self.layer_names = self.net.getLayerNames()
+        self.layer_names = [
+            self.layer_names[i[0] - 1] for i in self.net.getUnconnectedOutLayers()
+        ]
+        self.labels = open(labels).read().strip().split("\n")
 
         id_dictionary = {}
         with open(average_size, "r") as data:
@@ -99,13 +97,8 @@ class ImageDetector:
 
         # polygon used for lane detection
         # p1 = Polygon([(340, 150), (920, height - 550), (1570, 150)])
-        p1 = Polygon(
-            [
-                (width - 530, height - (height - 50)),
-                (width / 2 - 15, height - 200),
-                (width - 120, height - (height - 50)),
-            ]
-        )
+
+        p1 = Polygon(get_polygone("poly"))
 
         if detected_list:
             for i in detected_list:
@@ -133,9 +126,9 @@ class ImageDetector:
 
                 if intersection:
                     intersection_area = p2.intersection(p1).area
-                    print("Overlap procent: ", intersection_area / car_area)
+                    #print("Overlap procent: ", intersection_area / car_area)
                     if intersection_area >= car_area_min_val:
-                        print("more than 80% in the interesting zone")
+                        #print("more than 80% in the interesting zone")
                         d = self.get_distance(i.id, w, h)
                         distance_vector[d] = i.id
                         id = i.unique_id
@@ -148,61 +141,61 @@ class ImageDetector:
         height = image.shape[0]
         width = image.shape[1]
 
-        if time.time() - self.start > 0.1:
-            detected_obj = DetectedPipeline(image)
+        # if time.time() - self.start > 0.1:
+        detected_obj = DetectedPipeline(image)
 
-            if self.mode == 0:  # yolo modeld
-                detected_list = self.make_prediction(image)
+        if self.mode == 0:  # yolo modeld
+            detected_list = self.make_prediction(image)
 
-                if detected_list:
-                    distances, frontal_list = self.__get_distances(
-                        True, detected_list, height, width
-                    )
-                    detected_obj.frontal_distances = distances
-                    detected_obj.frontal_objects = frontal_list
-                    detected_obj.detected_objects = detected_list
-                    detected_obj.detected = True
-
-                self.start = time.time()
-                return detected_obj
-
-            else:
-                cv2_im = image
-                cv2_im_rgb = cv2.cvtColor(cv2_im, cv2.COLOR_BGR2RGB)
-                cv2_im_rgb = cv2.resize(cv2_im_rgb, self.inference_size)
-                run_inference(self.interpreter, cv2_im_rgb.tobytes())
-                objs = get_objects(self.interpreter, self.confidence)[: self.top_k]
-
-                detected_list = []
-                height, width, channels = cv2_im.shape
-                scale_x, scale_y = (
-                    width / self.inference_size[0],
-                    height / self.inference_size[1],
+            if detected_list:
+                distances, frontal_list = self.__get_distances(
+                    True, detected_list, height, width
                 )
-                # convert from object to detectedObject
-                for obj in objs:
-                    bbox = obj.bbox.scale(scale_x, scale_y)
-                    x0, y0 = int(bbox.xmin), int(bbox.ymin)
-                    x1, y1 = int(bbox.xmax) - x0, int(bbox.ymax) - y0
-                    bbox = [x0, y0, x1, y1]
+                detected_obj.frontal_distances = distances
+                detected_obj.frontal_objects = frontal_list
+                detected_obj.detected_objects = detected_list
+                detected_obj.detected = True
 
-                    label = self.labels[obj.id]
-                    color = self.colors[obj.id]
-                    detected_obj = DetectedObject(obj.id, obj.score, bbox, label, color)
-                    detected_list.append(detected_obj)
+            self.start = time.time()
+            return detected_obj
 
-                if detected_list:
-                    distances, frontal_list = self.__get_distances(
-                        True, detected_list, height
-                    )
-                    draw_box_parameters = (detected_list, distances, frontal_list)
-                else:
-                    draw_box_parameters = ()
-
-                self.start = time.time()
-                return draw_box_parameters
         else:
-            return ()
+            cv2_im = image
+            cv2_im_rgb = cv2.cvtColor(cv2_im, cv2.COLOR_BGR2RGB)
+            cv2_im_rgb = cv2.resize(cv2_im_rgb, self.inference_size)
+            run_inference(self.interpreter, cv2_im_rgb.tobytes())
+            objs = get_objects(self.interpreter, self.confidence)[: self.top_k]
+
+            detected_list = []
+            height, width, channels = cv2_im.shape
+            scale_x, scale_y = (
+                width / self.inference_size[0],
+                height / self.inference_size[1],
+            )
+            # convert from object to detectedObject
+            for obj in objs:
+                bbox = obj.bbox.scale(scale_x, scale_y)
+                x0, y0 = int(bbox.xmin), int(bbox.ymin)
+                x1, y1 = int(bbox.xmax) - x0, int(bbox.ymax) - y0
+                bbox = [x0, y0, x1, y1]
+
+                label = self.labels[obj.id]
+                color = self.colors[obj.id]
+                detected_obj = DetectedObject(obj.id, obj.score, bbox, label, color)
+                detected_list.append(detected_obj)
+
+            if detected_list:
+                distances, frontal_list = self.__get_distances(
+                    True, detected_list, height
+                )
+                draw_box_parameters = (detected_list, distances, frontal_list)
+            else:
+                draw_box_parameters = ()
+
+            self.start = time.time()
+            return draw_box_parameters
+        # else:
+        #     return ()
             # cv2_im, dictionary = self.append_objs_to_img(cv2_im, self.inference_size, objs, self.labels)
 
     def extract_boxes_confidences_classids(self, outputs, width, height):
@@ -355,24 +348,20 @@ def test():
     cfg = "yolo-files/yolov4-tiny.cfg"
     l = "yolo-files/coco.names"
     avg = "yolo-files/average_size.csv"
+    image = "yolo-files/test3.png"
 
-    imgDet = ImageDetector(w, cfg, l, avg)
+    imgDet = ImageDetector("yolo-files/yolov4-tiny.weights", "yolo-files/yolov4-tiny.cfg")
+    img = cv2.imread(image)
 
-    vid = cv2.VideoCapture(0)
+    start = time.time()
+    dictiz = imgDet.detect(img)
+    end = time.time()
+    detected_objs = dictiz.detected_objects
+    
+    
+    print("Total obj detected: ", len(detected_objs))
+    print("Total time: ", end-start)
 
-    while True:
-        ret, frame = vid.read()
-
-        if ret is True:
-            detected, dictiz = imgDet.detect(frame)
-            cv2.imshow("name", detected)
-
-        if cv2.waitKey(1) & 0xFF == ord("q"):
-            break
-
-    vid.release()
-
-    cv2.destroyAllWindows()
 
 
 # test()

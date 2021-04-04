@@ -15,6 +15,7 @@ from queue import Queue, Empty
 
 from image_detector import ImageDetector, DetectedObject
 from alerter import Alerter, Update
+from lane_detector import LaneDetector
 from storage import StoppableThread
 from storage import DetectedPipeline
 
@@ -27,7 +28,9 @@ results_queue = Queue(1)
 
 # debugging
 debug_mode = False
-
+timing = True
+average_time = 0
+average_time_counter = 0
 
 class AlertThread(StoppableThread):
     def __init__(self, name):
@@ -63,6 +66,21 @@ class AlertThread(StoppableThread):
     def update_data(self):
         self.alerter.update_alert_logger()
 
+class LaneDetectorThread(StoppableThread):
+
+    def run(self):
+
+        lane_detector = LaneDetector()
+
+        while not self.stopevent.isSet():
+            image_det = lane_detection_queue.get()
+
+            image = image_det[0]
+
+            detected_lines = lane_detector.detect_lane(image)
+            new_response = [image, image_det[1], detected_lines]
+            alerter_queue.put(new_response)
+        
 
 class ImageObjectDetectorThread(StoppableThread):
     def run(self):
@@ -77,8 +95,12 @@ class ImageObjectDetectorThread(StoppableThread):
 
             read_image = image_detection_queue.get()
 
+            #start = time.time()
             detection_results = imageDetector.detect(read_image)
             result = [read_image, detection_results]
+            #end = time.time()
+
+            #print("Image detection time: ", end-start)
 
             if lane_detection:
                 lane_detection_queue.put(result)
@@ -189,6 +211,15 @@ class Message:
 
         detected_obj = self._results[1]
         dictionary = {}
+        if debug_mode:
+            print("Processing results")
+
+        if lane_detection:
+            lines = self._results[2]
+            if len(lines)>=1:
+                dictionary["lines"] = lines.tolist()
+            else:
+                dictionary["lines"] = None
 
         if detected_obj:
             if detected_obj.detected:
@@ -232,6 +263,18 @@ class Message:
             # process it's content
 
             if self.json_header["request-type"] == "DETECT":
+                # self._uuid = self.json_header["uuid"]
+                if timing:
+                    global average_time, average_time_counter
+                    send_time = self.json_header["time"]
+                    dif = time.time() - send_time
+                    if average_time_counter > 100:
+                        print("Average time is: ", average_time/ average_time_counter)
+                    else:
+                        average_time += dif
+                        average_time_counter += 1
+                    print("From client to server: " + str(dif))
+                #print(str(time.time()- self.json_header["time"]))
 
                 # extract image from byte stream
                 jpg_original = base64.b64decode(self._data)
@@ -246,13 +289,18 @@ class Message:
 
                 self._results = results_queue.get()
 
+                if debug_mode:
+                    print("Object poped from queue: ", self._results)
+
                 if self._results:
                     self._process_results()
 
                 self._set_selector_events_mask("w")
 
             elif self.json_header["request-type"] == "UPDATE":
-
+                if debug_mode:
+                    print("Update request")
+               
                 update_mode = self.json_header["update"]
 
                 if update_mode == 1:
@@ -262,27 +310,39 @@ class Message:
                     experience = self.json_header["experience"]
                     reaction_time = self.json_header["reaction_time"]
                     record_mode = self.json_header["record_mode"]
-                    lane_det = self.json_header["lane"]
                     update = Update(
                         1,
-                        lane_det,
                         record_mode,
                         car_type,
                         weather,
                         experience,
                         reaction_time,
                     )
+                    for thread in threading.enumerate():
+                        if thread.name == "alerter":
+                            thread.update(update)
 
                 else:
                     # only lane updater was switched
+                    global lane_detection
+
                     lane_det = self.json_header["lane"]
-                    update = Update(0, lane_det)
+                    if debug_mode:
+                        print("Lane detector is: ", lane_det)
+                        print("Lane detection on sever is: ", lane_detection)
+                    if lane_det:
+                        if lane_detection is False:
+                            lane_thread = LaneDetectorThread("lane_detector").start()
+                            lane_detection = True
+                    else:
+                        if lane_detection is True:
+                            for thread in threading.enumerate():
+                                if thread.name == "lane_detector":
+                                    thread.join()
+                            lane_detection = False
 
                 # update local detector and alerter
-                for thread in threading.enumerate():
-                    if thread.name == "alerter":
-                        thread.update(update)
-
+               
                 self._results = ""
                 self._set_selector_events_mask("w")
 
@@ -297,11 +357,13 @@ class Message:
             encoded_response = self._json_encode(response)
             header = {
                 "response-type": "DETECTED",
-                "content-len":len(encoded_response)
+                "content-len":len(encoded_response),
+                "time":time.time()
             }
            
         else:
             header = {
+                "time":time.time(),
                 "response-type": "EMPTY",
                 }
 
@@ -326,10 +388,12 @@ class Message:
             else:
                 self._send_buffer = self._send_buffer[sent:]
         else:
-            print("--- main thread --- No content in send buffer")
+            if debug_mode:
+                print("--- main thread --- No content in send buffer")
 
     def write(self):
-
+        if debug_mode:
+            print("Writing to client")
         if self._request_done is False:
             self._generate_request()
 

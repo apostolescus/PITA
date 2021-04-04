@@ -7,7 +7,23 @@ close = False
 switch_sound = False
 update_message = False
 
+width = 640
+height = 480
 
+def get_polygone(type):
+    if type == "poly":
+        return  [
+                    (width - 530, height - (height - 50)),
+                    (width / 2 - 15, height - 200),
+                    (width - 120, height - (height - 50)),
+                ]
+    elif type == "np":
+        return[
+            (width - 530, height-50),
+            (int(width/2) - 15, 200),
+            (width - 120, height-50)
+        ]
+            
 class DetectedPipeline:
     def __init__(self, image):
 
@@ -127,6 +143,7 @@ class StoppableThread(Thread):
         Thread.__init__(self, name=name)
 
     def join(self):
+        print("Thread" + self.name + " is stopping")
         self.stopevent.set()
         Thread.join(self)
 

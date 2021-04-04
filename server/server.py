@@ -3,7 +3,8 @@ import selectors
 import traceback
 import server_message
 
-HOST = "127.0.0.1"
+#HOST = "127.0.0.1"
+HOST = "192.168.10.26"
 PORT = 65432
 
 selector = selectors.DefaultSelector()

@@ -5,8 +5,6 @@ Python Intelligent Traffic Assistant
 
 ## **DON'T FORGET BACKUP**
 
-### - [ ] Convert scripts for raspbian
-
 ### **Server:** 
 - [x] send single image localhost basic connection
 - [x] implement DETECT request
@@ -15,6 +13,8 @@ Python Intelligent Traffic Assistant
 - [x] implement UPDATE request
 - [x] implement UPDATE backend 
 - [x] add traffic alert 
+- [ ] add basic lane detection
+- [ ] add traffic light/sempahores warning
 - [ ] add advanced lane detection
 
 
@@ -22,10 +22,11 @@ Python Intelligent Traffic Assistant
 - [x] establish localhost connection
 - [x] implement capture-display pipeline
 - [x] add warning sound
+- [ ] convert script for raspbian
 
 ### **Coral TPU:**
  - [x] test tflite model
- - [ ] convert yolov4 lite model
+ - ~~[ ] convert yolov4 lite model~~
 
 ### **Lane detection:**
 - [x] add lane detector to pipeline
@@ -62,11 +63,15 @@ lane
 - [x] make noise when in danger
 - [ ] send data to firebase when danger
 
+### **Mobile:**
+- [ ] create GUI
+- [ ] fetch data from firebase
+
 ### **Others:**
 - [x] GUI
 - [x] Alert system
-- [ ] send information to firebase
 - [ ] add GUI button for update
+- [ ] send information to firebase
 - [ ] add mode for user to modify fix size time
 
 ### **Docs:**
@@ -205,4 +210,17 @@ The camera will record the last X seconds/minutes (X being the set period).
 
 
 
+### Server-Client Latency
 
+On a wifi from a mobile device the latency between server and client is 200 milisenconds.
+This mean that the picture taken by the device travels for about 0.12 s to the server and the response for about 0.7 s back to the device. The difference is explained by the size of the picture send compared to the one of the bounding boxes arrays ( sever times bigger).
+Given a server processing time by around: 0.2 seconds ( on a CPU with tiny-yolo), the average trip time would be around 0.4s.
+Given the human reaction time of 0.2-0.25s , the total capture-process-react time is aroung 0.6 seconds.
+If we go one step futher and we consider the spreading of 5G networks in the following years, the latency of the comunication could be reduce to 0.1s.
+
+***For 4G, this is 200 milliseconds, not far off the 250 milliseconds it takes for humans to react to visual stimuli. The 5G latency rate is significantly lower: at just 1 millisecond.*** 
+
+**ThalesGroup: "5G vs 4G: what’s the difference?"**
+
+Futher, if we integrate our system directly with the car and reduce human latency, the total time could be around 0.2-0.25 s( on a CPU). If we use a GPU for image detection and a more powerful computer, the total time could go as small as **0.1-0.15 seconds**. Almost half as the human reaction time.
+Until futher tehnical upgrades, the system can be used as an auxiliar preventive one, in case the person is not paying attention to the road.

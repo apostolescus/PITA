@@ -20,7 +20,6 @@ class Update:
     def __init__(
         self,
         mode,
-        lane,
         record_mode=None,
         car_type=None,
         weather=None,
@@ -36,8 +35,6 @@ class Update:
             self.experience = experience
             self.reaction_time = reaction_time
             self.record_mode = record_mode
-
-        self.lane = lane
 
 class Alerter:
     def __init__(
@@ -90,8 +87,6 @@ class Alerter:
                     RecordStorage.mode = record_mode
                     self.video_manager.start()
 
-        # process record
-        lane_det = update.lane
         print("DATA SUCCESSFULLY UPDATED")
 
     def draw_image(self, image, detected_bbx, lines=None):
