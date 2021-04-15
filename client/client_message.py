@@ -38,6 +38,11 @@ class Message:
         self._send_buffer = b""
         self._recv_buffer = b""
         self._current_image = None
+        
+        #only for lane detection comparision
+        self.out = cv2.VideoWriter("out.avi", cv2.VideoWriter_fourcc(*"MJPG"), 6, (640, 480))
+        self.counter = 65
+        self.saved = False
 
     def process_message(self, mask):
         if mask & selectors.EVENT_WRITE:
@@ -150,12 +155,7 @@ class Message:
         return msg
 
     def write(self):
-        # global counter
-
-        # if counter == max_val:
-        #     self.close()
-        #     return
-        # counter += 1
+   
         if mute is False:
             print("--- write --- entering write function")
 
@@ -265,6 +265,7 @@ class Message:
 
         obj_list = response["detected_objects"]
         danger = response["danger"]
+        line = response["lines"]
 
         switch_sound = get_switch_sound()
         if danger == 1 and switch_sound:
@@ -285,24 +286,50 @@ class Message:
             np.int32,
         )
 
-        for obj in obj_list:
-            x, y = obj["coordinates"][0], obj["coordinates"][1]
-            w, h = obj["coordinates"][2], obj["coordinates"][3]
+        image = self._current_image
 
-            color = obj["color"]
-            label = obj["label"]
-            score = obj["score"]
-            text = "{}: {:.4f}".format(label, score)
-            image = self._current_image
+        if obj_list is not None:
+            for obj in obj_list:
+                x, y = obj["coordinates"][0], obj["coordinates"][1]
+                w, h = obj["coordinates"][2], obj["coordinates"][3]
 
-            cv2.rectangle(image, (x, y), (x + w, y + h), color, 2)
-            cv2.putText(
-                image, text, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2
-            )
+                color = obj["color"]
+                label = obj["label"]
+                score = obj["score"]
+                text = "{}: {:.4f}".format(label, score)
 
-            self._current_image = image
+                cv2.rectangle(image, (x, y), (x + w, y + h), color, 2)
+                cv2.putText(
+                    image, text, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2
+                )
+            
+                self._current_image = image
+        
+        if line is not None:
+            line_image = np.zeros_like(image)
 
-        cv2.polylines(self._current_image, pts, True, (0, 255, 255), 2)
+            for x1, y1, x2, y2 in line:
+                try:
+                    cv2.line(line_image,(x1, y1),(x2, y2),(0, 190, 255), 11)
+                except:
+                    return None
+            self._current_image = cv2.addWeighted(self._current_image, 1, line_image, 0.5, 1)
+
+       
+            #print("Lines: ", type(line))
+            #self._current_image = cv2.addWeighted(self._current_image, 1, line, 0.5, 1)
+
+        #only for experimental/ debugging purpose
+        if self.counter >= 0:    
+            self.out.write(self._current_image)
+            self.counter -= 1
+        else:
+            if self.saved is False:
+                print("VIDEO SAVED SUCCESFULLY")
+                self.out.release()
+                self.saved = True
+
+        #cv2.polylines(self._current_image, pts, True, (0, 255, 255), 2)
 
     def _read(self):
 

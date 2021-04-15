@@ -11,7 +11,7 @@ from storage import toggle_update_message
 
 import client_message
 
-HOST = "194.61.21.135"
+HOST = "194.61.21.75"
 #HOST = "127.0.0.1"
 PORT = 65432
 
