@@ -1,3 +1,4 @@
+# TODO: 1. close app on button
 # GUI imports
 from kivy.app import App
 from kivy.uix.image import Image
@@ -9,6 +10,9 @@ from kivy.graphics.texture import Texture
 # other libraries
 from queue import Queue, Empty
 import cv2
+import os
+import psutil
+from threading import enumerate
 
 # import local dependencies
 from camera_manager import CameraManagerSingleton
@@ -23,8 +27,8 @@ result_queue = Queue(1)
 # global variables
 switch = False
 
-# debug
-mode = "0"
+# used for camera or video capture selection
+mode = "video"
 
 
 class Display(BoxLayout):
@@ -33,23 +37,27 @@ class Display(BoxLayout):
 
 
 class Screen_One(Screen):
-    def __init__(self, **kwargs):
 
+    def __init__(self, **kwargs):
         super(Screen_One, self).__init__(**kwargs)
         self.capture = CameraManagerSingleton.getInstance(mode)
+
+        #schedule update
         Clock.schedule_interval(self.update, 1.0 / 30)
 
     def update(self, dt):
+        """ Captures image from cameraManager and puts it in pipeline"""
         global captured_image_queue, result_queue
 
         frame = self.capture.getFrame()
-        # put image in pipeline and send it to video recorder
+
+        # put image in pipeline
         try:
             captured_image_queue.put_nowait(frame)
-            # videoManager.record(frame)
         except:
             pass
 
+        # display processed image
         try:
             img = result_queue.get_nowait()
             buf1 = cv2.flip(img, 0)
@@ -65,9 +73,12 @@ class Screen_One(Screen):
 
 
 class Screen_Two(Screen):
+    """ Class for managing UI for settings menu. 
+    ALlows for multiple fine tuning selection of parameters."""
+
     def on_spinner_select(self, text):
 
-        temp_var = 0
+        temp_var = ""
         if text == "Standard":
             temp_var = 0
         elif text == "Camion":
@@ -80,12 +91,12 @@ class Screen_Two(Screen):
         UISelected.car_type = temp_var
 
     def on_slider_change_value(self, text):
+
         UISelected.reaction_time = text
 
-    # use this
     def on_spinner_select_driver_experience(self, text):
 
-        temp_var = 0
+        temp_var = ""
         if text == "Incepator":
             temp_var = 0
         elif text == "Mediu":
@@ -111,8 +122,7 @@ class Screen_Two(Screen):
 
     def on_spinner_select_record_type(self, text):
 
-        temp_var = 0
-        print("selected text: ", text)
+        temp_var = ""
         if text == "Smart Mode":
             temp_var = 0
         elif text == "Permanent":
@@ -125,6 +135,7 @@ class Screen_Two(Screen):
         UISelected.rec_mode = temp_var
 
     def update_settings(self):
+
         UISelected.updated = True
         toggle_update_message()
 
@@ -135,11 +146,16 @@ class CameraApp(App):
         return Display()
 
     def on_stop(self):
-        # videoManager.stop()
-
+        
+        # stop all the other threads
         for thread in enumerate():
-            if thread.name != "MainThread" and thread.name != "guiThread":
+            if thread.name != "guiThread" and thread.name != "MainThread":
                 thread.join()
+
+        current_system_pid = os.getpid()
+
+        ThisSystem = psutil.Process(current_system_pid)
+        ThisSystem.terminate()
 
     def switch_callback(self):
         global switch

@@ -1,8 +1,17 @@
 import cv2
 from threading import Lock
 
+# TODO: LOAD image resize from config_file
+
+# config_file: video_path, resize shape
 
 class CameraManagerSingleton:
+    """Class that manages camera frame capture and resize it to configured dimenssions.
+    It supports two mode video capture: from already recorded video or live stream from camera.
+    For live camera stream it will select the default camera for the device. If used in video mode 
+    specify the path to the video file when calling the constructor. 
+    Use mode='video' or 'camera'. 
+    Call the getFrame() method to obtain the most recent frame. """
 
     _lock = Lock()
     __instance = None
@@ -14,14 +23,15 @@ class CameraManagerSingleton:
         return CameraManagerSingleton.__instance
 
     def __init__(self, mode, path):
-        if mode == "1":
+        if mode == "camera":
             self.camera = cv2.VideoCapture(0)
         else:
             self.camera = cv2.VideoCapture(path)
+
         CameraManagerSingleton.__instance = self
 
     def getFrame(self):
-
+        """Reads frame by frame from camera and resize it to specific sizes"""
         ret, frame = self.camera.read()
 
         frame_shape = frame.shape
@@ -45,19 +55,31 @@ class CameraManagerSingleton:
 
 
 def Test_CamManagerVideoRec():
+
+    # initialize cameraManager
     camManager = CameraManagerSingleton.getInstance()
+    
+    # initialize videoManager
     vidManager = VideoManagerSingleton.getInstance()
+
+    # specify a value for maximum frames
     counter = 0
 
     while counter != 200:
+
+        # capture frame from camera
         frame = camManager.getFrame()
+
+        # send it to videoRecorder
         vidManager.record(frame, True)
         counter += 1
 
+    # test if singleton works
     anotherVideo = VideoManagerSingleton.getInstance()
+
+    # save the video
     anotherVideo.save(True)
     camManager.closeCamera()
-
 
 def Test_CamManagerWrapper():
 
@@ -74,7 +96,6 @@ def Test_CamManagerWrapper():
 
     wrapper.stop()
     camManager.closeCamera()
-
 
 # Test_CamManagerWrapper()
 # Test_CamManagerVideoRec()

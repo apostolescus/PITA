@@ -1,15 +1,17 @@
+"""Module responsible for handling communication messages between server and client.
+"""
+import time
+import base64
+from threading import Thread
+
 import selectors
 import json
-import sys
 import struct
-import io
 import numpy as np
-from threading import Thread
 import cv2
-import base64
-import uuid
+
 from playsound import playsound
-import time
+
 
 # import locals
 from screen_manager import captured_image_queue, result_queue
@@ -49,13 +51,6 @@ class Message:
             self.write()
         if mask & selectors.EVENT_READ:
             self.read()
-
-    def _json_decode(self, json_bytes, encoding="utf-8"):
-
-        tiow = io.TextIOWrapper(io.BytesIO(json_bytes), encoding=encoding, newline="")
-        obj = json.load(tiow)
-        tiow.close()
-        return obj
 
     def _json_encode(self, stream):
         return json.dumps(stream, ensure_ascii=False).encode()
@@ -181,7 +176,7 @@ class Message:
             # else:
             #     print("Send buffer", self._send_buffer)
 
-    def _write(self):
+    def _write(self)->bool:
 
         if self._send_buffer:
             try:
@@ -192,7 +187,8 @@ class Message:
             else:
                 self._send_buffer = self._send_buffer[sent:]
 
-        # if the buffer is not empty repeat sending
+         # if the buffer is not empty repeat sending
+       
         if not self._send_buffer:
             return True
         else:
@@ -254,14 +250,13 @@ class Message:
                 self._read_header = True
 
                 decoded_response = self._json_decode(data)
-
+                
                 self._display_image(decoded_response)
                 self._set_selector_events_mask("w")
 
         result_queue.put(self._current_image)
 
     def _display_image(self, response):
-
 
         obj_list = response["detected_objects"]
         danger = response["danger"]
@@ -290,6 +285,7 @@ class Message:
 
         if obj_list is not None:
             for obj in obj_list:
+                print("OBJ IS: ", obj)
                 x, y = obj["coordinates"][0], obj["coordinates"][1]
                 w, h = obj["coordinates"][2], obj["coordinates"][3]
 

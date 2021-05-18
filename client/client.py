@@ -1,37 +1,41 @@
-import sys
+"""This module should be run to start the PITA program from the client side.
+It will open a connection with the server and send a message.
+Modifiy HOST and PORT to your server.
+If you want to use localhost for testing put HOST='127.0.0.1'.
+Don't forget to modify in the sever side script too."""
+
 import socket
 import selectors
 import traceback
-import cv2
-import base64
 
 from screen_manager import GUIManagerThread
-from screen_manager import captured_image_queue, result_queue
 from storage import toggle_update_message
 
 import client_message
 
-HOST = "194.61.21.75"
-#HOST = "127.0.0.1"
+# HOST = "194.61.21.139"
+HOST = "127.0.0.1"
 PORT = 65432
 
 sel = selectors.DefaultSelector()
 
 
 def start_connection():
+    """ Initialize connection with the server"""
     toggle_update_message()
     addr = (HOST, PORT)
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.setblocking(False)
     sock.connect_ex(addr)
-    events = selectors.EVENT_READ | selectors.EVENT_WRITE
-    message = client_message.Message(sel, sock, addr)
-    sel.register(sock, events, data=message)
+    event = selectors.EVENT_READ | selectors.EVENT_WRITE
+    start_message = client_message.Message(sel, sock, addr)
+    sel.register(sock, event, data=start_message)
 
 
 start_connection()
 
 try:
+    # start the GUI
     guiManager = GUIManagerThread("guiThread")
     guiManager.start()
 
