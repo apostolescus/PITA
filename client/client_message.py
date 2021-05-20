@@ -9,6 +9,7 @@ import json
 import struct
 import numpy as np
 import cv2
+import io
 
 from playsound import playsound
 
@@ -25,7 +26,7 @@ lane_detection = False
 counter = 0
 start = False
 max_val = 10000
-mute = True
+mute = False
 timing = True
 average_time = 0
 average_time_counter = 0
@@ -51,6 +52,13 @@ class Message:
             self.write()
         if mask & selectors.EVENT_READ:
             self.read()
+
+    def _json_decode(self, json_bytes, encoding="utf-8"):
+
+        tiow = io.TextIOWrapper(io.BytesIO(json_bytes), encoding=encoding, newline="")
+        obj = json.load(tiow)
+        tiow.close()
+        return obj
 
     def _json_encode(self, stream):
         return json.dumps(stream, ensure_ascii=False).encode()
@@ -159,6 +167,7 @@ class Message:
                 print("--- write --- request done is False")
             self._generate_request()
 
+        # write all bufffer
         while True:
             if self._write():
                 break
@@ -214,13 +223,17 @@ class Message:
 
         if not mute:
             print("--- main thread --- processing request")
+
         if json_type == "EMPTY":
-            self._read_header = True
-            self._request_done = False
-            self.write()
             
             if not mute:
                 print("--- main thread --- empty request")
+                
+            self._read_header = True
+            self._request_done = False
+            #self.write()
+            self._set_selector_events_mask("w")
+            
 
             # send another frame
         elif json_type == "DETECTED":
@@ -252,6 +265,7 @@ class Message:
                 decoded_response = self._json_decode(data)
                 
                 self._display_image(decoded_response)
+                
                 self._set_selector_events_mask("w")
 
         result_queue.put(self._current_image)

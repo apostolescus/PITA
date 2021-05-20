@@ -13,8 +13,16 @@ Python Intelligent Traffic Assistant
 - [x] implement UPDATE request
 - [x] implement UPDATE backend 
 - [x] add traffic alert 
-- [ ] add basic lane detection
+- [x] add basic lane detection
+- [x] perform detection on GPU
+- [x] add encrypted communication using ceritificates
 - [ ] add traffic light/sempahores warning
+
+**Optional**:
+
+- [ ] improve lane detection
+- [ ] split gpu detection multithread
+- [ ] split lane/object detection multithread
 - [ ] add advanced lane detection
 
 
@@ -22,7 +30,8 @@ Python Intelligent Traffic Assistant
 - [x] establish localhost connection
 - [x] implement capture-display pipeline
 - [x] add warning sound
-- [ ] convert script for raspbian
+- [x] add encrypted communication using ceritificates
+- [x] convert script for raspbian
 
 ### **Coral TPU:**
  - [x] test tflite model
@@ -52,9 +61,9 @@ Python Intelligent Traffic Assistant
 ### **Network:**
 - [x] implement both tf and yolo detection
 - [x] add detection for TF lite
-- [ ] label other images
+- [x] label other images
+- [x] perform detection on GPU
 - [ ] train network
-- [ ] convert network
 
 ### **Alerter:**
 - [x] alert only for vehicles on the same 
@@ -64,14 +73,13 @@ lane
 - [ ] send data to firebase when danger
 
 ### **Mobile:**
-- [ ] create GUI
-- [ ] fetch data from firebase
+- [x] create GUI
+- [x] fetch data from firebase
 
 ### **Others:**
 - [x] GUI
 - [x] Alert system
 - [ ] add GUI button for update
-- [ ] send information to firebase
 - [ ] add mode for user to modify fix size time
 
 ### **Docs:**

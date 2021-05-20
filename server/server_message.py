@@ -27,8 +27,8 @@ alerter_queue = Queue(1)
 results_queue = Queue(1)
 
 # debugging
-debug_mode = False
-timing = True
+debug_mode = True
+timing = False
 average_time = 0
 average_time_counter = 0
 
@@ -52,16 +52,15 @@ class AlertThread(StoppableThread):
         self.stop = False
 
         while not self.stopevent.isSet():
-
+            #print("Before fetching from queue")
             third_step = alerter_queue.get()
-
-            # self.alerter.video_manager.record(image)
+            #print("Fetched from queue")
             self.alerter.video_manager.record(third_step[0])
             self.alerter.check_safety(third_step)
 
-            # drawn_image = self.alerter.draw_image(res[0], res[1], lines)
             results_queue.put(third_step)
 
+        threading.Thread.join(self)
 
     def update_data(self):
         self.alerter.update_alert_logger()
@@ -73,25 +72,42 @@ class LaneDetectorThread(StoppableThread):
         lane_detector = LaneDetector()
 
         while not self.stopevent.isSet():
-            image_det = lane_detection_queue.get()
+            try:
+                image_det = lane_detection_queue.get()
+                image = image_det[0]
 
-            image = image_det[0]
+                detected_lines = lane_detector.detect_lane(image)
 
-            detected_lines = lane_detector.detect_lane(image)
-            new_response = [image, image_det[1], detected_lines]
-            alerter_queue.put(new_response)
-        
+                new_response = [image, image_det[1], detected_lines]
+                alerter_queue.put(new_response)
+            except:
+                continue
+
+        # try:
+        #     value = lane_detection_queue.get_nowait()   
+        # except Empty:
+        #     print("No object in queue")
+        # else:
+        #     print("There was an object in queue")
+        #     alerter_queue.put(value)
+
+        #
+        # print("LANE DETECTION STOPPED")
+        # threading.Thread.join(self)
+
 
 class ImageObjectDetectorThread(StoppableThread):
     def run(self):
 
         imageDetector = ImageDetector(
-            "yolo-files/yolov4-tiny.weights", "yolo-files/yolov4-tiny.cfg"
+             config_file ="yolo-files/yolov4-tiny.cfg",
+             weights = "yolo-files/yolov4-tiny.weights",
+             mode="GPU"
         )
 
         # imageDetector = ImageDetector("yolo-files/mobilenet_ssd_v2_coco_quant_postprocess_edgetpu.tflite", "yolo-files/yolov4-tiny.cfg", model = "tflite")
-
-        while True:
+        print("Image Detector succesfully initialized")
+        while not self.stopevent.isSet():
 
             read_image = image_detection_queue.get()
 
@@ -101,12 +117,15 @@ class ImageObjectDetectorThread(StoppableThread):
             #end = time.time()
 
             #print("Image detection time: ", end-start)
-
+            #print("Imae detection lane_value: ", lane_detection)
             if lane_detection:
+                #print("-- image detector --- putting in Lane Detection Queue")
                 lane_detection_queue.put(result)
             else:
+                #print("-- image detector --- putting in Alerter Queue")
                 alerter_queue.put(result)
 
+        threading.Thread.join(self)
 
 image_thread = ImageObjectDetectorThread("image_detector").start()
 alerter_thread = AlertThread("alerter").start()
@@ -163,7 +182,7 @@ class Message:
 
     def _read(self):
         try:
-            data = self.sock.recv(2048)
+            data = self.sock.recv(2048*8)
         except BlockingIOError:
             pass
         else:
@@ -211,6 +230,7 @@ class Message:
 
         detected_obj = self._results[1]
         dictionary = {}
+
         if debug_mode:
             print("Processing results")
 
@@ -220,6 +240,8 @@ class Message:
                 dictionary["lines"] = lines.tolist()
             else:
                 dictionary["lines"] = None
+        else:
+            dictionary["lines"] = None
 
         if detected_obj:
             if detected_obj.detected:
@@ -244,6 +266,12 @@ class Message:
 
                 dictionary["detected_objects"] = formatted_list
                 dictionary["danger"] = detected_obj.danger
+            else:
+                dictionary["detected_objects"] = None
+                dictionary["danger"] = None
+        else:
+            dictionary["detected_objects"] = None
+            dictionary["danger"] = None
 
         self._results = dictionary
 
@@ -268,11 +296,13 @@ class Message:
                     global average_time, average_time_counter
                     send_time = self.json_header["time"]
                     dif = time.time() - send_time
+
                     if average_time_counter > 100:
                         print("Average time is: ", average_time/ average_time_counter)
                     else:
                         average_time += dif
                         average_time_counter += 1
+
                     print("From client to server: " + str(dif))
                 #print(str(time.time()- self.json_header["time"]))
 
@@ -288,13 +318,13 @@ class Message:
                 self._data = b""
 
                 self._results = results_queue.get()
-
+                
                 if debug_mode:
                     print("Object poped from queue: ", self._results)
 
-                if self._results:
-                    self._process_results()
-
+                
+                self._process_results()
+                
                 self._set_selector_events_mask("w")
 
             elif self.json_header["request-type"] == "UPDATE":
@@ -327,19 +357,27 @@ class Message:
                     global lane_detection
 
                     lane_det = self.json_header["lane"]
+                    #print("Land detector is: ", lane_det)
                     if debug_mode:
                         print("Lane detector is: ", lane_det)
                         print("Lane detection on sever is: ", lane_detection)
+
                     if lane_det:
                         if lane_detection is False:
+                            #print("Before thread starting: ", threading.active_count())
                             lane_thread = LaneDetectorThread("lane_detector").start()
                             lane_detection = True
+                            #print("After thread starting: ", threading.active_count())
                     else:
                         if lane_detection is True:
+                            #print("Before stopping thread: ", threading.active_count())
                             for thread in threading.enumerate():
                                 if thread.name == "lane_detector":
+                                    print("Stopping thread")
                                     thread.join()
                             lane_detection = False
+                            #rint("After stop threads running: ", threading.active_count())
+                    #print("Lane detection variable: ", lane_detection)
 
                 # update local detector and alerter
                

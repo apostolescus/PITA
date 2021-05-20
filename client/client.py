@@ -7,29 +7,39 @@ Don't forget to modify in the sever side script too."""
 import socket
 import selectors
 import traceback
-
+import ssl
 from screen_manager import GUIManagerThread
 from storage import toggle_update_message
 
 import client_message
 
-# HOST = "194.61.21.139"
-HOST = "127.0.0.1"
-PORT = 65432
+HOST = "194.61.20.73"
+#HOST = "127.0.0.1"
+PORT = 65430
 
 sel = selectors.DefaultSelector()
 
 
 def start_connection():
+    server_sni_hostname = 'pita'
+    server_cert = 'server_certificate/server.crt'
+    client_cert = 'client_certificates/client.crt'
+    client_key = 'client_certificates/client.key'
+
+    context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile=server_cert)
+    context.load_cert_chain(certfile=client_cert, keyfile=client_key)
+
     """ Initialize connection with the server"""
     toggle_update_message()
     addr = (HOST, PORT)
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.setblocking(False)
-    sock.connect_ex(addr)
+    #sock.setblocking(False)
+    conn = context.wrap_socket(sock, server_side=False, server_hostname=server_sni_hostname)
+    conn.connect(addr)
+
     event = selectors.EVENT_READ | selectors.EVENT_WRITE
-    start_message = client_message.Message(sel, sock, addr)
-    sel.register(sock, event, data=start_message)
+    start_message = client_message.Message(sel, conn, addr)
+    sel.register(conn, event, data=start_message)
 
 
 start_connection()
