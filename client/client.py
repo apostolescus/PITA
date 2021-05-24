@@ -8,34 +8,38 @@ import socket
 import selectors
 import traceback
 import ssl
+
 from screen_manager import GUIManagerThread
-from storage import toggle_update_message
+from storage import toggle_update_message, logger, config_file
 from gps import GPS
 
 import client_message
 
-HOST = "194.61.21.96"
-#HOST = "127.0.0.1"
-PORT = 65432
+HOST = config_file["SERVER"]["ip"]
+PORT = config_file["SERVER"].getint("port")
 
 sel = selectors.DefaultSelector()
 
 
-def start_connection():
-    server_sni_hostname = 'pita'
-    server_cert = 'server_certificate/server.crt'
-    client_cert = 'client_certificates/client.crt'
-    client_key = 'client_certificates/client.key'
+def start_connection() -> None:
+    """Initialize socket connection with server.
+    Loads and verifies certificates."""
+
+    server_sni_hostname = config_file["CERTIFICATES"]["hostname"]
+    server_cert = config_file["CERTIFICATES"]["server_cert"]
+    client_cert = config_file["CERTIFICATES"]["client_cert"]
+    client_key = config_file["CERTIFICATES"]["client_key"]
 
     context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile=server_cert)
     context.load_cert_chain(certfile=client_cert, keyfile=client_key)
 
-    """ Initialize connection with the server"""
     toggle_update_message()
     addr = (HOST, PORT)
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    #sock.setblocking(False)
-    conn = context.wrap_socket(sock, server_side=False, server_hostname=server_sni_hostname)
+
+    conn = context.wrap_socket(
+        sock, server_side=False, server_hostname=server_sni_hostname
+    )
     conn.connect(addr)
 
     event = selectors.EVENT_READ | selectors.EVENT_WRITE
@@ -50,7 +54,7 @@ try:
     guiManager = GUIManagerThread("guiThread")
     guiManager.start()
 
-    #start GPS th
+    # start GPS thread
     current_gps = GPS("gps-thread")
     current_gps.start()
 
@@ -61,12 +65,13 @@ try:
             try:
                 message.process_message(mask)
             except Exception:
-                print(
+                logger.exception(
                     "main: error: exception for",
                     f"{message.addr}:\n{traceback.format_exc()}",
                 )
                 message.close()
+
 except KeyboardInterrupt:
-    print("caught keyboard interrupt, exiting")
+    logger.exception("caught keyboard interrupt, exiting ... ")
 finally:
     sel.close()

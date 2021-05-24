@@ -1,0 +1,39 @@
+[VIDEO]
+mode = video
+path = ../video/good.mp4
+width = 640
+height = 480
+update = 30
+
+[CONFIGURATION]
+# 0 stock, 1 truck 2 bus 3 sport
+car_type = 0  
+# 0 dry 1 wet 2 snow 3 ice
+weather = 0  
+# 0 beginner 1 intermediate 2 advanced
+experience = 0  
+# 0 smart mode 1 permanent 2 fix-size
+rec_mode = 0  
+reaction_time = 0.5
+
+[LOGGER]
+file = log.file
+
+[SERVER]
+ip = 194.61.20.246
+port = 65432
+
+[CERTIFICATES]
+client_cert = client_certificates/client.crt
+server_cert = server_certificate/server.crt
+client_key = client_certificates/client.key
+hostname = pita
+
+[DETECTION]
+points = [asda]
+
+[DEBUG]
+verbose = False
+time = False
+# save x video frames
+video_frames = 0 

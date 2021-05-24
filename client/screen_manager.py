@@ -1,25 +1,23 @@
-# TODO: 1. close app on button
-# GUI imports
+import os
+from threading import enumerate
+from queue import Queue
+
+# other libraries
+import psutil
+import cv2
+
+# GUI libraries
 from kivy.app import App
-from kivy.uix.image import Image
 from kivy.clock import Clock
-from kivy.uix.screenmanager import ScreenManager, Screen
+from kivy.uix.screenmanager import Screen
 from kivy.uix.boxlayout import BoxLayout
 from kivy.graphics.texture import Texture
 
-# other libraries
-from queue import Queue, Empty
-import cv2
-import os
-import psutil
-from threading import enumerate
-
 # import local dependencies
 from camera_manager import CameraManagerSingleton
-from gps import GPS
 from storage import UISelected, StoppableThread
-from storage import toggle_update_message, get_update_message
-from storage import toggle_switch_sound
+from storage import toggle_update_message
+from storage import toggle_switch_sound, config_file
 
 # Queues for pipeline
 captured_image_queue = Queue(1)
@@ -28,9 +26,6 @@ result_queue = Queue(1)
 # global variables
 switch = False
 
-# used for camera or video capture selection
-mode = "video"
-
 
 class Display(BoxLayout):
     def __init__(self, **kwargs):
@@ -38,19 +33,21 @@ class Display(BoxLayout):
 
 
 class Screen_One(Screen):
+    """Main Screen, displays image and has basic configuration options"""
 
     def __init__(self, **kwargs):
         super(Screen_One, self).__init__(**kwargs)
-        self.capture = CameraManagerSingleton.getInstance(mode)
+        self.capture = CameraManagerSingleton.get_instance(config_file)
 
-        #schedule update
-        Clock.schedule_interval(self.update, 1.0 / 30)
+        # schedule update
+        update_interval = int(config_file["VIDEO"]["update"])
+        Clock.schedule_interval(self.update, 1.0 / update_interval)
 
     def update(self, dt):
         """ Captures image from cameraManager and puts it in pipeline"""
         global captured_image_queue, result_queue
 
-        frame = self.capture.getFrame()
+        frame = self.capture.get_frame()
 
         # put image in pipeline
         try:
@@ -74,7 +71,7 @@ class Screen_One(Screen):
 
 
 class Screen_Two(Screen):
-    """ Class for managing UI for settings menu. 
+    """Class for managing UI for settings menu.
     ALlows for multiple fine tuning selection of parameters."""
 
     def on_spinner_select(self, text):
@@ -147,7 +144,6 @@ class CameraApp(App):
         return Display()
 
     def on_stop(self):
-        
         # stop all the other threads
         for thread in enumerate():
             if thread.name != "guiThread" and thread.name != "MainThread":
@@ -171,7 +167,7 @@ class CameraApp(App):
             UISelected.lane_detection = False
 
     def sound_callback(self):
-       toggle_switch_sound()
+        toggle_switch_sound()
 
     def update_data(self):
         for thread in enumerate():
@@ -183,5 +179,3 @@ class GUIManagerThread(StoppableThread):
     def run(self):
         gui = CameraApp()
         gui.run()
-
-

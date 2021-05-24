@@ -137,6 +137,7 @@ class Alerter:
     def check_safety(self, detected_result):
 
         safe = True
+       
         # self.video_manager.record(detected_result[0])
         detected_results = detected_result[1]
 
@@ -151,7 +152,11 @@ class Alerter:
                     sorted_distances = sorted(dictionary)
 
                     # get speed from GPS
-                    speed = 220
+                    gps_infos = detected_result[2]
+
+                    speed = gps_infos[0]
+                    lat = gps_infos[1]
+                    lon = gps_infos[2]
 
                     max_distance = self._calculate_max_distance(speed)
 
@@ -162,7 +167,9 @@ class Alerter:
                             # self.alert_logger.add_data(speed, i, time.time(), True)
                             print("Danger, more than 80% precent overlaping")
                             detected_results.danger = 1
-                            # start smart recording
+
+                            # uploading to firebase
+                            self.alert_logger.fast_upload("frontal_colision", speed, time.time(), 1, lat, lon)
 
                             if not RecordStorage.start_smart:
                                 RecordStorage.start_smart = True

@@ -26,6 +26,7 @@ Python Intelligent Traffic Assistant
 - [x] add warning sound
 - [x] add encrypted communication using ceritificates
 - [x] convert script for raspbian
+- [ ] add CONFIG file
 
 ### **Coral TPU:**
  - [x] test tflite model

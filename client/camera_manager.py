@@ -1,28 +1,31 @@
-import cv2
 from threading import Lock
+import cv2
 
-# TODO: LOAD image resize from config_file
-
-# config_file: video_path, resize shape
 
 class CameraManagerSingleton:
     """Class that manages camera frame capture and resize it to configured dimenssions.
     It supports two mode video capture: from already recorded video or live stream from camera.
-    For live camera stream it will select the default camera for the device. If used in video mode 
-    specify the path to the video file when calling the constructor. 
-    Use mode='video' or 'camera'. 
-    Call the getFrame() method to obtain the most recent frame. """
+    For live camera stream it will select the default camera for the device. If used in video mode
+    specify the path to the video file when calling the constructor.
+    Use mode='video' or 'camera'.
+    Call the get_frame() method to obtain the most recent frame."""
 
     _lock = Lock()
     __instance = None
 
     @staticmethod
-    def getInstance(mode, path="../video/good.mp4"):
-        if CameraManagerSingleton.__instance == None:
-            CameraManagerSingleton(mode, path)
+    def get_instance(config_file):
+        if CameraManagerSingleton.__instance is None:
+            CameraManagerSingleton(config_file)
         return CameraManagerSingleton.__instance
 
-    def __init__(self, mode, path):
+    def __init__(self, config_file):
+
+        mode = config_file["VIDEO"]["mode"]
+        path = config_file["VIDEO"]["path"]
+        self.width = int(config_file["VIDEO"]["width"])
+        self.height = int(config_file["VIDEO"]["height"])
+
         if mode == "camera":
             self.camera = cv2.VideoCapture(0)
         else:
@@ -30,21 +33,23 @@ class CameraManagerSingleton:
 
         CameraManagerSingleton.__instance = self
 
-    def getFrame(self):
+    def get_frame(self):
         """Reads frame by frame from camera and resize it to specific sizes"""
         ret, frame = self.camera.read()
 
         frame_shape = frame.shape
 
         if ret is True:
-            if frame_shape[0] > 480 or frame_shape[1] > 640:
-                resized = cv2.resize(frame, (640, 480), interpolation=cv2.INTER_AREA)
+            if frame_shape[0] > self.height or frame_shape[1] > self.width:
+                resized = cv2.resize(
+                    frame, (self.width, self.height), interpolation=cv2.INTER_AREA
+                )
                 self.frame = resized
             else:
                 self.frame = frame
             return self.frame
 
-    def closeCamera(self):
+    def close_camera(self):
         self.camera.release()
 
     def show(self, image=None):
@@ -54,13 +59,13 @@ class CameraManagerSingleton:
             cv2.imshow("img", image)
 
 
-def Test_CamManagerVideoRec():
+def test_cam_manager_video_rec():
 
     # initialize cameraManager
-    camManager = CameraManagerSingleton.getInstance()
-    
+    camManager = CameraManagerSingleton.get_instance()
+
     # initialize videoManager
-    vidManager = VideoManagerSingleton.getInstance()
+    vidManager = VideoManagerSingleton.get_instance()
 
     # specify a value for maximum frames
     counter = 0
@@ -68,34 +73,32 @@ def Test_CamManagerVideoRec():
     while counter != 200:
 
         # capture frame from camera
-        frame = camManager.getFrame()
+        frame = camManager.get_frame()
 
         # send it to videoRecorder
         vidManager.record(frame, True)
         counter += 1
 
     # test if singleton works
-    anotherVideo = VideoManagerSingleton.getInstance()
+    anotherVideo = VideoManagerSingleton.get_instance()
 
     # save the video
     anotherVideo.save(True)
-    camManager.closeCamera()
+    camManager.close_camera()
 
-def Test_CamManagerWrapper():
 
-    camManager = CameraManagerSingleton.getInstance()
+def Test_cam_manager_wrapper():
+
+    camManager = CameraManagerSingleton.get_instance()
     wrapper = VideoManagerWrapper()
     counter = 0
 
     wrapper.start()
 
     while counter != 200:
-        frame = camManager.getFrame()
+        frame = camManager.get_frame()
         wrapper.record(frame)
         counter += 1
 
     wrapper.stop()
-    camManager.closeCamera()
-
-# Test_CamManagerWrapper()
-# Test_CamManagerVideoRec()
+    camManager.close_camera()
