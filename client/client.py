@@ -10,12 +10,13 @@ import traceback
 import ssl
 from screen_manager import GUIManagerThread
 from storage import toggle_update_message
+from gps import GPS
 
 import client_message
 
-HOST = "194.61.20.73"
+HOST = "194.61.21.96"
 #HOST = "127.0.0.1"
-PORT = 65430
+PORT = 65432
 
 sel = selectors.DefaultSelector()
 
@@ -48,6 +49,10 @@ try:
     # start the GUI
     guiManager = GUIManagerThread("guiThread")
     guiManager.start()
+
+    #start GPS th
+    current_gps = GPS("gps-thread")
+    current_gps.start()
 
     while True:
         events = sel.select(timeout=1)

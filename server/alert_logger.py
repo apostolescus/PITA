@@ -21,6 +21,7 @@ class AlerterLogger:
         self.firebase_link = (
             "https://pita-13817-default-rtdb.europe-west1.firebasedatabase.app/"
         )
+        self.firebase_app = firebase.FirebaseApplication(self.firebase_link, None)
 
     def _test_internet(self):
         try:
@@ -29,8 +30,8 @@ class AlerterLogger:
         except:
             return False
 
-    def add_data(self, speed, object_id, timestamp, danger):
-        self.writer.writerow([timestamp, speed, object_id, danger])
+    def add_data(self, mode, time, danger, speed, lat, lon):
+        self.writer.writerow([mode, time, danger, speed, lat, lon])
 
     def upload_data(self):
 
@@ -48,10 +49,12 @@ class AlerterLogger:
             for row in reader:
                 # print(row)
                 data = {
-                    "time": row[0],
-                    "speed": row[1],
-                    "danger": row[3],
-                    "object": row[2],
+                    "time": row[1],
+                    "speed": row[3],
+                    "danger": row[2],
+                    "type": row[0],
+                    "lat":row[4],
+                    "lon":row[5]
                 }
                 _firebase.post("drivignInfos/", data)
 
@@ -59,7 +62,21 @@ class AlerterLogger:
             # send kivy alert
             print("No internet connection")
 
-
+    def fast_upload(self, alert_type, speed, timestamp, danger, lat, lon):
+        
+        data = {
+            "time":timestamp,
+            "speed":speed,
+            "type":alert_type,
+            "danger":danger,
+            "lat":lat,
+            "lon":lon
+        }
+        print("Adding data to firebase")
+        self.firebase_app.post("drivingInfos/", data)
+        self.firebase_app.post("backup_driver_infos", data)
+        print("Data added to firebase")
+        
 def test():
 
     dbManager = AlerterLogger()

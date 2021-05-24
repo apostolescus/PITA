@@ -5,8 +5,8 @@ import ssl
 
 import server_message
 
-HOST = "192.168.10.144"
-PORT = 65430
+HOST = "192.168.10.39"
+PORT = 65432
 
 selector = selectors.DefaultSelector()
 

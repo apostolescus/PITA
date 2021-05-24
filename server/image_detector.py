@@ -162,6 +162,11 @@ class ImageDetector:
             print("CPU mode")
             self.net = cv2.dnn.readNetFromDarknet(config_file, weights)
             self.layer_names = self.net.getLayerNames()
+            try:
+                self.net.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
+                self.net.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)
+            except:
+                print("No GPU found")
             self.layer_names = [
                 self.layer_names[i[0] - 1] for i in self.net.getUnconnectedOutLayers()
             ]
@@ -181,6 +186,7 @@ class ImageDetector:
         
         self.labels = open(labels).read().strip().split("\n")
         self.logger = loguru.logger
+
         start_time = time.strftime('%Y-%m-%d-%H-%M-%S', time.localtime(time.time()))
         log_file_name = '{:s}_{:s}.log'.format("LOG_FILE", start_time)
         log_file_path = os.path.join(os.getcwd(), log_file_name)
@@ -277,7 +283,6 @@ class ImageDetector:
         height = image.shape[0]
         width = image.shape[1]
 
-        
         detected_obj = DetectedPipeline(image)
         detected_list = self.make_prediction(image)
 
@@ -357,8 +362,9 @@ class ImageDetector:
 
         height, width = image.shape[:2]
         detected_objects = []
-
-        if self.mode == 0: #CPU detection
+        
+        #CPU detection
+        if self.mode == 0:  
             # Create a blob and pass it through the model
             blob = cv2.dnn.blobFromImage(
                 image, 1 / 255.0, (416, 416), swapRB=True, crop=False
@@ -383,7 +389,8 @@ class ImageDetector:
                         classIDs[i], confidences[i], boxes[i], label, color
                     )
                     detected_objects.append(detected_object)
-        else: #GPU detection
+        #GPU detection
+        else: 
             cv2_im = image
             original_frame = cv2.cvtColor(cv2_im, cv2.COLOR_BGR2RGB)
 

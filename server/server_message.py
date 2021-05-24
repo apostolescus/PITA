@@ -27,7 +27,7 @@ alerter_queue = Queue(1)
 results_queue = Queue(1)
 
 # debugging
-debug_mode = True
+debug_mode = False
 timing = False
 average_time = 0
 average_time_counter = 0
@@ -45,16 +45,12 @@ class AlertThread(StoppableThread):
     def run(self):
         global lane_detection_queue
 
-        # starts GPS thread
-        # gps = GPS("GPSThread")
-        # gps.start()
-
         self.stop = False
 
         while not self.stopevent.isSet():
-            #print("Before fetching from queue")
+            
             third_step = alerter_queue.get()
-            #print("Fetched from queue")
+            
             self.alerter.video_manager.record(third_step[0])
             self.alerter.check_safety(third_step)
 
@@ -75,10 +71,12 @@ class LaneDetectorThread(StoppableThread):
             try:
                 image_det = lane_detection_queue.get()
                 image = image_det[0]
-
+                start_time = time.time()
                 detected_lines = lane_detector.detect_lane(image)
 
-                new_response = [image, image_det[1], detected_lines]
+                new_response = [image, image_det[1], detected_lines, image_det[2]]
+                end_time = time.time()
+                print("Total lane det time: ", end_time-start_time)
                 alerter_queue.put(new_response)
             except:
                 continue
@@ -100,21 +98,20 @@ class ImageObjectDetectorThread(StoppableThread):
     def run(self):
 
         imageDetector = ImageDetector(
-             config_file ="yolo-files/yolov4-tiny.cfg",
-             weights = "yolo-files/yolov4-tiny.weights",
-             mode="GPU"
+            "yolo-files/yolov4-tiny.weights", "yolo-files/yolov4-tiny.cfg"
         )
 
         # imageDetector = ImageDetector("yolo-files/mobilenet_ssd_v2_coco_quant_postprocess_edgetpu.tflite", "yolo-files/yolov4-tiny.cfg", model = "tflite")
-        print("Image Detector succesfully initialized")
+
         while not self.stopevent.isSet():
 
-            read_image = image_detection_queue.get()
+            (read_image, gps_infos) = image_detection_queue.get()
 
-            #start = time.time()
+            start = time.time()
             detection_results = imageDetector.detect(read_image)
-            result = [read_image, detection_results]
-            #end = time.time()
+            result = [read_image, detection_results, gps_infos]
+            end = time.time()
+            print("Total detection time: ", end-start)
 
             #print("Image detection time: ", end-start)
             #print("Imae detection lane_value: ", lane_detection)
@@ -306,13 +303,20 @@ class Message:
                     print("From client to server: " + str(dif))
                 #print(str(time.time()- self.json_header["time"]))
 
+                # extract speed and gps coordinates
+                gps_speed = self.json_header["speed"]
+                gps_lat = self.json_header["lat"]
+                gps_lon = self.json_header["lon"]
+                
+                gps_infos = [gps_speed, gps_lat, gps_lon]
+
                 # extract image from byte stream
                 jpg_original = base64.b64decode(self._data)
                 jpg_as_np = np.frombuffer(jpg_original, dtype=np.uint8)
                 img = cv2.imdecode(jpg_as_np, flags=1)
 
                 # add image to processing queue
-                image_detection_queue.put(img)
+                image_detection_queue.put((img, gps_infos))
 
                 # clear reciving buffer
                 self._data = b""

@@ -17,13 +17,7 @@ Python Intelligent Traffic Assistant
 - [x] perform detection on GPU
 - [x] add encrypted communication using ceritificates
 - [ ] add traffic light/sempahores warning
-
-**Optional**:
-
-- [ ] improve lane detection
-- [ ] split gpu detection multithread
-- [ ] split lane/object detection multithread
-- [ ] add advanced lane detection
+- [x] allow both CPU/GPU detection
 
 
 ### **Client:**
@@ -55,7 +49,7 @@ Python Intelligent Traffic Assistant
 - [x] implement distance measurment
 - [x] smart recording mode
 - [x] start smart recording by default
-- [ ] connect GPIO Camera
+- [x] connect GPIO Camera
 - [ ] connect external screen
 
 ### **Network:**
@@ -70,16 +64,26 @@ Python Intelligent Traffic Assistant
 lane
 - [x] add connection to Firebase
 - [x] make noise when in danger
-- [ ] send data to firebase when danger
+- [x] send data to firebase when danger
+- [ ] save in redundancy database
 
 ### **Mobile:**
 - [x] create GUI
 - [x] fetch data from firebase
+- [x] display alerts on mobile
 
-### **Others:**
-- [x] GUI
-- [x] Alert system
-- [ ] add GUI button for update
+### **Other:**
+- [ ] add logguru
+- [ ] add alerts for other type of incidents
+- [ ] show notification on GUI
+- [ ] remove GUI button for update
+
+**Optional**:
+
+- [ ] improve lane detection
+- [ ] split gpu detection multithread
+- [ ] split lane/object detection multithread
+- [ ] add advanced lane detection
 - [ ] add mode for user to modify fix size time
 
 ### **Docs:**
@@ -88,7 +92,7 @@ lane
 - [ ] distance measure documentation
 - [ ] lane detection
 - [ ] code cleaning
-- [ ] sources organisation in directories
+- [x] sources organisation in directories
 
 ## Image Detector
 

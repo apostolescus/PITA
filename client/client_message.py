@@ -12,12 +12,12 @@ import cv2
 import io
 
 from playsound import playsound
-
+from gps import GPS
 
 # import locals
 from screen_manager import captured_image_queue, result_queue
 from storage import toggle_update_message, get_update_message
-from storage import UISelected, get_switch_sound
+from storage import UISelected, get_switch_sound, get_gps_infos
 
 #globals 
 lane_detection = False
@@ -26,7 +26,7 @@ lane_detection = False
 counter = 0
 start = False
 max_val = 10000
-mute = False
+mute = True
 timing = True
 average_time = 0
 average_time_counter = 0
@@ -121,27 +121,43 @@ class Message:
             msg = message_hdr + encoded_header
 
         else:
+            # extract iamge from queue
             self._current_image = captured_image_queue.get()
+            
+            # for DEBUG only
+            # if start is False:
+            #     height = self._current_image.shape[0]
+            #     width = self._current_image.shape[1]
 
-            if start is False:
-                height = self._current_image.shape[0]
-                width = self._current_image.shape[1]
+            #     print("Polygon coordinates: ")
+            #     print(width - 530, height - (height - 50))
+            #     print(width / 2 - 15, height - (200))
+            #     print(width - 120, height - (height - 50))
+            #     start = True
 
-                print("Polygon coordinates: ")
-                print(width - 530, height - (height - 50))
-                print(width / 2 - 15, height - (200))
-                print(width - 120, height - (height - 50))
-                start = True
-
+            # encode image in base64
             content = base64.b64encode(cv2.imencode(".jpg", self._current_image)[1])
+
+            # DEBUG
             if mute is False:
                 print("--- generate_request --- content len: ", len(content))
 
+            # get GPS infos
+            gps_infos = get_gps_infos()
+
+            gps_speed = gps_infos[0]
+            gps_lat = gps_infos[1]
+            gps_lon = gps_infos[2]
+
+            # create header dictionary
             header = {
                 "request-type": "DETECT",
                 "time":time.time(),
+                "speed":gps_speed,
+                "lat":gps_lat,
+                "lon":gps_lon,
                 #"uuid":str(uuid.uuid4()),
-                "content-len": len(content),
+                "content-len":len(content),
             }
             
 

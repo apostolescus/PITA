@@ -1,11 +1,20 @@
 from threading import Thread, Event, Lock
+from queue import Queue
 import copy
 import logging
 
 lock = Lock()
+gps_lock = Lock()
+gps_queue = Queue()
+
 close = False
 switch_sound = False
 update_message = False
+
+# store last gps data
+old_gps_value:list = [0,0,0]
+old_gps_lat: float = 0
+old_gps_lon: float = 0
 
 class UISelected:
 
@@ -38,6 +47,35 @@ def toggle_switch_sound():
         switch_sound = False
     else:
         switch_sound = True
+
+def gps_update_infos(speed:int, lat:float, lon:float)->None:
+
+    gps_lock.acquire()
+
+    # if gps_queue.full():
+    #     gps_queue.get()
+
+    gps_queue.put((speed, lat, lon))
+   
+    gps_lock.release()
+
+def get_gps_infos()->[int, float, float]:
+
+    global old_gps_value
+    infos = []
+   
+    gps_lock.acquire()
+    
+    infos = gps_queue.get()
+    # if gps_queue.full():
+    #     infos = gps_queue.get()
+    #     old_gps_value = infos
+    # else:
+    #     infos = old_gps_value
+
+    gps_lock.release()
+
+    return infos
 
 class StoppableThread(Thread):
     def __init__(self, name):

@@ -16,6 +16,7 @@ from threading import enumerate
 
 # import local dependencies
 from camera_manager import CameraManagerSingleton
+from gps import GPS
 from storage import UISelected, StoppableThread
 from storage import toggle_update_message, get_update_message
 from storage import toggle_switch_sound
@@ -182,3 +183,5 @@ class GUIManagerThread(StoppableThread):
     def run(self):
         gui = CameraApp()
         gui.run()
+
+
