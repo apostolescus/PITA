@@ -16,8 +16,8 @@ Python Intelligent Traffic Assistant
 - [x] add basic lane detection
 - [x] perform detection on GPU
 - [x] add encrypted communication using ceritificates
-- [ ] add traffic light/sempahores warning
 - [x] allow both CPU/GPU detection
+- [ ] add traffic light/sempahores warning
 
 
 ### **Client:**
@@ -26,7 +26,9 @@ Python Intelligent Traffic Assistant
 - [x] add warning sound
 - [x] add encrypted communication using ceritificates
 - [x] convert script for raspbian
-- [ ] add CONFIG file
+- [x] add CONFIG file
+- [x] clean code
+- [ ] send polygone with first message
 
 ### **Coral TPU:**
  - [x] test tflite model
