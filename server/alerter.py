@@ -15,6 +15,7 @@ import time
 import threading
 import cv2
 
+non_alert_list = ['car', 'bus', 'camion', 'moto']
 
 class Update:
     def __init__(
@@ -51,6 +52,7 @@ class Alerter:
         self.multiply = FrictionCoefficient.formula.multiplier / friction_coef
         self.reaction_time = reaction_time * Constants.km_to_h
         self.recording_mode = 0
+        self.alerts = {}
         self.recording = False
         self.started = False
         self.update_obj = None
@@ -140,14 +142,17 @@ class Alerter:
        
         # self.video_manager.record(detected_result[0])
         detected_results = detected_result[1]
-
+        
         if detected_results:
             detected = detected_results.detected
 
             if detected:
                 distances = detected_results.frontal_distances
+                
+                detected_results.alerts.clear()
 
                 if len(distances) >= 1:
+                    
                     dictionary = distances.items()
                     sorted_distances = sorted(dictionary)
 
@@ -170,6 +175,13 @@ class Alerter:
 
                             # uploading to firebase
                             self.alert_logger.fast_upload("frontal_colision", speed, time.time(), 1, lat, lon)
+                            
+                            if 'frontal_collision' in self.alerts:
+                                if time.time() - self.alerts['frontal_collision'] > 2:
+                                    self.alerts['frontal_collision'] = time.time()
+                                    detected_results.alerts.append('frontal_collision')
+                            else:
+                                self.alerts['frontal_collision'] = time.time()
 
                             if not RecordStorage.start_smart:
                                 RecordStorage.start_smart = True
@@ -178,9 +190,28 @@ class Alerter:
 
                             return True
 
-                            # 
+
 
                     # if now in safe state and in smart mode stop recording
+        
+                # add alerts to repsonse alert list
+                # an object is added to an alert list only if it passed more than 4 sec
+                # since the last notification
+
+                for detected_object in detected_results.detected_objects:
+                    if detected_object.label not in non_alert_list:
+                        # check if object in alert 
+                        if detected_object.label in self.alerts:
+                            alert_time = self.alerts[detected_object.label]
+
+                            if time.time() - alert_time > 4:
+                                self.alerts[detected_object.label] = time.time()
+                                detected_results.alerts.append(detected_object.label)
+                                
+                        else:
+                            self.alerts[detected_object.label] = time.time()
+
+
         if safe and RecordStorage.start_smart:
             RecordStorage.start_smart = False
 

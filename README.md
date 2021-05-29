@@ -68,7 +68,7 @@ lane
 - [x] add connection to Firebase
 - [x] make noise when in danger
 - [x] send data to firebase when danger
-- [ ] save in redundancy database
+- [x] save in redundancy database
 
 ### **Mobile:**
 - [x] create GUI
@@ -79,7 +79,7 @@ lane
 - [ ] add logguru
 - [ ] add alerts for other type of incidents
 - [ ] show notification on GUI
-- [ ] remove GUI button for update
+- [x] remove GUI button for update
 
 **Optional**:
 

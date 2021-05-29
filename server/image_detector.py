@@ -285,7 +285,7 @@ class ImageDetector:
 
         detected_obj = DetectedPipeline(image)
         detected_list = self.make_prediction(image)
-
+        
         if detected_list:
             distances, frontal_list = self.__get_distances(
                 True, detected_list, height, width

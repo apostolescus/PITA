@@ -31,6 +31,7 @@ class DetectedPipeline:
         self.detected = False
         self.detected_objects = None
         self.danger = 0
+        self.alerts = []
         self.frontal_objects = None
         self.frontal_distances = None
         self.line_array = None

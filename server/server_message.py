@@ -245,6 +245,7 @@ class Message:
 
                 formatted_list = []
                 detected_list = detected_obj.detected_objects
+                alerts = detected_obj.alerts
 
                 for obj in detected_list:
 
@@ -263,6 +264,11 @@ class Message:
 
                 dictionary["detected_objects"] = formatted_list
                 dictionary["danger"] = detected_obj.danger
+                
+                if alerts:
+                    dictionary["alerts"] = alerts
+                else:
+                    dictionary["alerts"] = None
             else:
                 dictionary["detected_objects"] = None
                 dictionary["danger"] = None
@@ -391,6 +397,7 @@ class Message:
     def _generate_request(self):
 
         response = self._results
+        print("Response: ", response)
         encoded_response = b""
         # objects succesfully detected
         # send response

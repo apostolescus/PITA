@@ -10,6 +10,7 @@ import json
 import struct
 import numpy as np
 import cv2
+import notify2
 from playsound import playsound
 
 # import locals
@@ -19,6 +20,9 @@ from storage import UISelected, get_switch_sound, get_gps_infos, logger
 
 # globals
 lane_detection = False
+
+# notification initialization
+notify2.init('PITA')
 
 # debugg
 counter = config_file["DEBUG"].getint("video_frames")
@@ -311,8 +315,13 @@ class Message:
         danger = response["danger"]
         line = response["lines"]
 
+        # modify by message
+        n = notify2.Notification('ALERT', 'New Alert')
+        n.show()
+
         switch_sound = get_switch_sound()
         if danger == 1 and switch_sound:
+            
             t = Thread(target=play_sound)
             t.start()
 

@@ -146,24 +146,6 @@
                     id: switch
                     on_active: app.switch_callback()
 
-            BoxLayout:
-                orientation: 'vertical'
-                spacing:10
-                padding:5
-
-                Label:
-                    text:'Upload to Cloud'
-                    font_size: 20
-                    font_name: font_bold
-
-                Button:
-                    text: 'Upload'
-                    font_name: font_regular
-                    background_normal: ''
-                    background_color: rgba(highlight)
-                    font_size: 17
-                    on_release: app.update_data()
-
 
 <Screen_Two>:
     name: 'screen_two'      #<<<<<<<<<<<<<<<<
