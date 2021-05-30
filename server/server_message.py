@@ -58,8 +58,6 @@ class AlertThread(StoppableThread):
 
         threading.Thread.join(self)
 
-    def update_data(self):
-        self.alerter.update_alert_logger()
 
 class LaneDetectorThread(StoppableThread):
 
@@ -338,6 +336,7 @@ class Message:
                 self._set_selector_events_mask("w")
 
             elif self.json_header["request-type"] == "UPDATE":
+
                 if debug_mode:
                     print("Update request")
                
@@ -351,7 +350,6 @@ class Message:
                     reaction_time = self.json_header["reaction_time"]
                     record_mode = self.json_header["record_mode"]
                     update = Update(
-                        1,
                         record_mode,
                         car_type,
                         weather,
@@ -374,10 +372,8 @@ class Message:
 
                     if lane_det:
                         if lane_detection is False:
-                            #print("Before thread starting: ", threading.active_count())
                             lane_thread = LaneDetectorThread("lane_detector").start()
                             lane_detection = True
-                            #print("After thread starting: ", threading.active_count())
                     else:
                         if lane_detection is True:
                             #print("Before stopping thread: ", threading.active_count())
