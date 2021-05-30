@@ -20,6 +20,7 @@ from storage import UISelected, get_switch_sound, get_gps_infos, logger
 
 # globals
 lane_detection = False
+first_message = False
 
 # notification initialization
 notify2.init('PITA')
@@ -314,10 +315,14 @@ class Message:
         obj_list = response["detected_objects"]
         danger = response["danger"]
         line = response["lines"]
+        alerts = response["alerts"]
 
-        # modify by message
-        n = notify2.Notification('ALERT', 'New Alert')
-        n.show()
+        # display alerts
+        if alerts:
+            for alert in alerts:
+                n = notify2.Notification('ALERT', alert)
+                n.show()
+                time.sleep(0.2)
 
         switch_sound = get_switch_sound()
         if danger == 1 and switch_sound:

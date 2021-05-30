@@ -1,7 +1,8 @@
-from video_manager import VideoManagerSingleton
-from storage import RecordStorage
 import threading
 import cv2
+
+from video_manager import VideoManagerSingleton
+from storage import RecordStorage, logger
 
 
 class VideoManagerWrapper:
@@ -36,9 +37,9 @@ class VideoManagerWrapper:
         if RecordStorage.recording:
             # if smart mode is enable
             if RecordStorage.mode == 0:
-                # and objcect is detected close enough
+                # and objcct is detected close enough
                 if RecordStorage.start_smart:
-                    print("Smart Recording")
+                    logger.level("VIDEO", "Smart mode Started")
                     self.vm.record(frame, True)
             # if permanent mode enable
             elif RecordStorage.mode == 1:
@@ -51,7 +52,7 @@ class VideoManagerWrapper:
 
     def start(self):
         self.safe_enter()
-        print("Video manager start")
+        logger.level("VIDEO", "Video Manager Started recording")
         RecordStorage.recording = True
 
         self.vm.set_name()
@@ -59,7 +60,7 @@ class VideoManagerWrapper:
         self.safe_exit()
 
     def stop(self):
-        print("Video manager stopping")
+        logger.level("VIDEO", "Video Manager Stopped recording")
         self.safe_enter()
 
         check = True
@@ -70,39 +71,25 @@ class VideoManagerWrapper:
             check = False
         else:
             check = True
-        print("Check is: ", check)
+
         # start a new thread to save the video
         save_thread = threading.Thread(target=self.vm.save, args=(check,))
         save_thread.start()
 
-        #self.vm.save(check)
-
-        print("Saved finished")
+        logger.level("VIDEO", "Video Saved")
         self.safe_exit()
 
     def start_smart(self):
 
         self.safe_enter()
         RecordStorage.start_smart = True
-        # elf.start_rec = True
+
         self.safe_exit()
 
     def stop_smart(self):
 
         self.safe_enter()
         RecordStorage.start_smart = False
-        # self.start_rec = False
-        self.safe_exit()
-
-    def update(self):
-
-        self.safe_enter()
-
-        self.global_record = RecordStorage.record
-        self.smart = RecordStorage.smart
-        self.start_rec = RecordStorage.start_rec_var
-        self.permanent = RecordStorage.permanent
-        self.fixed = RecordStorage.fix
 
         self.safe_exit()
 

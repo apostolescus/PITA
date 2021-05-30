@@ -3,38 +3,36 @@ import struct
 import io
 import json
 import base64
-import cv2
-import copy
-import numpy as np
-
 import uuid
 import threading
 import time
-from datetime import datetime
-from queue import Queue, Empty
+from queue import Queue
+import cv2
+import numpy as np
 
-from image_detector import ImageDetector, DetectedObject
+from image_detector import ImageDetector
 from alerter import Alerter, Update
 from lane_detector import LaneDetector
 from storage import StoppableThread
-from storage import DetectedPipeline
+from storage import logger, config_file, timer, debug_mode
 
 lane_detection = False
 
+# build pipeline
 image_detection_queue = Queue(1)
 lane_detection_queue = Queue(1)
 alerter_queue = Queue(1)
 results_queue = Queue(1)
 
 # debugging
-debug_mode = False
-timing = False
 average_time = 0
 average_time_counter = 0
 
-class AlertThread(StoppableThread):
-    def __init__(self, name):
 
+class AlertThread(StoppableThread):
+    """Wrapper for Alert Class to Stoppable Thread."""
+
+    def __init__(self, name):
         super(AlertThread, self).__init__(name)
         height = 1080
         self.alerter = Alerter([(340, height - 150), (920, 550), (1570, height - 150)])
@@ -48,9 +46,9 @@ class AlertThread(StoppableThread):
         self.stop = False
 
         while not self.stopevent.isSet():
-            
+
             third_step = alerter_queue.get()
-            
+
             self.alerter.video_manager.record(third_step[0])
             self.alerter.check_safety(third_step)
 
@@ -60,6 +58,7 @@ class AlertThread(StoppableThread):
 
 
 class LaneDetectorThread(StoppableThread):
+    """ Stoppable Thread wrapper for Lane Detector class."""
 
     def run(self):
 
@@ -67,66 +66,93 @@ class LaneDetectorThread(StoppableThread):
 
         while not self.stopevent.isSet():
             try:
+                # fetch image from pipeline
                 image_det = lane_detection_queue.get()
                 image = image_det[0]
-                start_time = time.time()
+
+                if timer:
+                    start_time = time.time()
+
+                # perform lane detection
                 detected_lines = lane_detector.detect_lane(image)
 
+                # craft response and send in pipeline
                 new_response = [image, image_det[1], detected_lines, image_det[2]]
-                end_time = time.time()
-                print("Total lane det time: ", end_time-start_time)
+
+                if timer:
+                    end_time = time.time()
+                    logger.level(
+                        "LANE_DETECTOR",
+                        "Total lane det time: " + str(end_time - start_time),
+                    )
+
                 alerter_queue.put(new_response)
             except:
                 continue
 
-        # try:
-        #     value = lane_detection_queue.get_nowait()   
-        # except Empty:
-        #     print("No object in queue")
-        # else:
-        #     print("There was an object in queue")
-        #     alerter_queue.put(value)
-
-        #
-        # print("LANE DETECTION STOPPED")
-        # threading.Thread.join(self)
-
 
 class ImageObjectDetectorThread(StoppableThread):
+    """ Stoppable Thread wrapper for Image Detector class."""
+
+    def __init__(self, name):
+        super(ImageObjectDetectorThread, self).__init__(name)
+
+        self.yolo_weights = config_file["DETECTION"]["yolo_weights"]
+        self.yolo_cfg = config_file["DETECTION"]["yolo_cfg"]
+        self.detection_mode = config_file["DETECTION"]["mode"]
+        self.labels = config_file["DETECTION"]["labels"]
+        self.avg_size_csv = config_file["DETECTION"]["avg_file"]
+        self.confidence = config_file["DETECTION"]["confidence"]
+        self.threshold = config_file["DETECTION"]["threshold"]
+
     def run(self):
 
         imageDetector = ImageDetector(
-            "yolo-files/yolov4-tiny.weights", "yolo-files/yolov4-tiny.cfg"
+            weights=self.yolo_weights,
+            config_file=self.yolo_cfg,
+            mode=self.detection_mode,
+            labels=self.labels,
+            average_size=self.avg_size_csv,
+            confidence=self.confidence,
+            threshold=self.threshold,
         )
 
-        # imageDetector = ImageDetector("yolo-files/mobilenet_ssd_v2_coco_quant_postprocess_edgetpu.tflite", "yolo-files/yolov4-tiny.cfg", model = "tflite")
-
         while not self.stopevent.isSet():
-
+            # fetch image from pipeline
             (read_image, gps_infos) = image_detection_queue.get()
 
-            start = time.time()
-            detection_results = imageDetector.detect(read_image)
-            result = [read_image, detection_results, gps_infos]
-            end = time.time()
-            print("Total detection time: ", end-start)
+            if timer:
+                start = time.time()
 
-            #print("Image detection time: ", end-start)
-            #print("Imae detection lane_value: ", lane_detection)
+            # perform object detection
+            detection_results = imageDetector.detect(read_image)
+
+            result = [read_image, detection_results, gps_infos]
+
+            if timer:
+                end = time.time()
+                logger.level("IMAGE_DETECTOR", "detection time is: " + str(end - start))
+
             if lane_detection:
-                #print("-- image detector --- putting in Lane Detection Queue")
+                # print("-- image detector --- putting in Lane Detection Queue")
                 lane_detection_queue.put(result)
             else:
-                #print("-- image detector --- putting in Alerter Queue")
+                # print("-- image detector --- putting in Alerter Queue")
                 alerter_queue.put(result)
 
         threading.Thread.join(self)
+
 
 image_thread = ImageObjectDetectorThread("image_detector").start()
 alerter_thread = AlertThread("alerter").start()
 
 
 class Message:
+    """
+    Server Side Message Class.
+    Contains messages templates to communicate with the client.
+    """
+
     def __init__(self, selector, sock, addr):
         self.selector = selector
         self.sock = sock
@@ -151,22 +177,21 @@ class Message:
         """Set selector to listen for events: mode is 'r', 'w', or 'rw'."""
         if mode == "r":
             if debug_mode:
-                print("--- main thread --- Server switched to read mode")
+                logger.level("SERVER", "Server switched to read mode")
             events = selectors.EVENT_READ
         elif mode == "w":
             if debug_mode:
-                print("--- main thread --- Server switched to write mode")
+                logger.level("SERVER", "Server switched to write mode")
             events = selectors.EVENT_WRITE
         elif mode == "rw":
             if debug_mode:
-                print("--- main thread --- Server switched to read/write mode")
+                logger.level("SERVER", "Server switched to read/write mode")
             events = selectors.EVENT_READ | selectors.EVENT_WRITE
         else:
-            raise ValueError(f"Invalid events mask mode {repr(mode)}.")
+            logger.error(f"Invalid events mask mode {repr(mode)}.")
         self.selector.modify(self.sock, events, data=self)
 
     def _json_decode(self, json_bytes, encoding="utf-8"):
-
         tiow = io.TextIOWrapper(io.BytesIO(json_bytes), encoding=encoding, newline="")
         obj = json.load(tiow)
         tiow.close()
@@ -177,7 +202,7 @@ class Message:
 
     def _read(self):
         try:
-            data = self.sock.recv(2048*8)
+            data = self.sock.recv(2048 * 8)
         except BlockingIOError:
             pass
         else:
@@ -227,11 +252,11 @@ class Message:
         dictionary = {}
 
         if debug_mode:
-            print("Processing results")
+            logger.level("SEVER", "Processing Results")
 
         if lane_detection:
             lines = self._results[2]
-            if len(lines)>=1:
+            if len(lines) >= 1:
                 dictionary["lines"] = lines.tolist()
             else:
                 dictionary["lines"] = None
@@ -262,7 +287,7 @@ class Message:
 
                 dictionary["detected_objects"] = formatted_list
                 dictionary["danger"] = detected_obj.danger
-                
+
                 if alerts:
                     dictionary["alerts"] = alerts
                 else:
@@ -289,29 +314,34 @@ class Message:
 
         if self._read_header:
             # the full message was received
-            # process it's content
+            # process the content
 
             if self.json_header["request-type"] == "DETECT":
                 # self._uuid = self.json_header["uuid"]
-                if timing:
+                if timer:
                     global average_time, average_time_counter
                     send_time = self.json_header["time"]
                     dif = time.time() - send_time
 
                     if average_time_counter > 100:
-                        print("Average time is: ", average_time/ average_time_counter)
+                        logger.level(
+                            "SERVER",
+                            "Average time is: "
+                            + str(average_time / average_time_counter),
+                        )
                     else:
                         average_time += dif
                         average_time_counter += 1
 
-                    print("From client to server: " + str(dif))
-                #print(str(time.time()- self.json_header["time"]))
+                    logger.level("From client to server: " + str(dif))
+
+                # print(str(time.time()- self.json_header["time"]))
 
                 # extract speed and gps coordinates
                 gps_speed = self.json_header["speed"]
                 gps_lat = self.json_header["lat"]
                 gps_lon = self.json_header["lon"]
-                
+
                 gps_infos = [gps_speed, gps_lat, gps_lon]
 
                 # extract image from byte stream
@@ -326,20 +356,15 @@ class Message:
                 self._data = b""
 
                 self._results = results_queue.get()
-                
-                if debug_mode:
-                    print("Object poped from queue: ", self._results)
-
-                
                 self._process_results()
-                
+
                 self._set_selector_events_mask("w")
 
             elif self.json_header["request-type"] == "UPDATE":
 
                 if debug_mode:
-                    print("Update request")
-               
+                    logger.level("SERVER", "update request")
+
                 update_mode = self.json_header["update"]
 
                 if update_mode == 1:
@@ -365,52 +390,46 @@ class Message:
                     global lane_detection
 
                     lane_det = self.json_header["lane"]
-                    #print("Land detector is: ", lane_det)
+
                     if debug_mode:
-                        print("Lane detector is: ", lane_det)
-                        print("Lane detection on sever is: ", lane_detection)
+                        logger.level("SERVER", "Lane detector is: " + str(lane_det))
 
                     if lane_det:
                         if lane_detection is False:
-                            lane_thread = LaneDetectorThread("lane_detector").start()
+                            LaneDetectorThread("lane_detector").start()
                             lane_detection = True
                     else:
-                        if lane_detection is True:
-                            #print("Before stopping thread: ", threading.active_count())
+                        if lane_detection:
                             for thread in threading.enumerate():
                                 if thread.name == "lane_detector":
-                                    print("Stopping thread")
+                                    logger.level("SERVER", "Stopping Lane Detector")
                                     thread.join()
-                            lane_detection = False
-                            #rint("After stop threads running: ", threading.active_count())
-                    #print("Lane detection variable: ", lane_detection)
 
-                # update local detector and alerter
-               
+                            lane_detection = False
+
                 self._results = ""
                 self._set_selector_events_mask("w")
 
     def _generate_request(self):
 
         response = self._results
-        print("Response: ", response)
         encoded_response = b""
+
         # objects succesfully detected
         # send response
-
         if len(response) >= 1:
             encoded_response = self._json_encode(response)
             header = {
                 "response-type": "DETECTED",
-                "content-len":len(encoded_response),
-                "time":time.time()
+                "content-len": len(encoded_response),
+                "time": time.time(),
             }
-           
+        # no object was detected
         else:
             header = {
-                "time":time.time(),
+                "time": time.time(),
                 "response-type": "EMPTY",
-                }
+            }
 
         encoded_header = self._json_encode(header)
         message_hdr = struct.pack("<H", len(encoded_header))
@@ -426,7 +445,7 @@ class Message:
             try:
                 sent = self.sock.send(self._send_buffer)
                 if debug_mode:
-                    print("--- main thread --- Sended :", sent)
+                    logger.level("SERVER", "Sended: " + str(sent))
                 self._request_done = False
             except BlockingIOError:
                 pass
@@ -434,11 +453,12 @@ class Message:
                 self._send_buffer = self._send_buffer[sent:]
         else:
             if debug_mode:
-                print("--- main thread --- No content in send buffer")
+                logger.level("SERVER", "No content in send buffer")
 
     def write(self):
         if debug_mode:
-            print("Writing to client")
+            logger.level("SERVER", "Writing to client")
+
         if self._request_done is False:
             self._generate_request()
 
@@ -452,17 +472,15 @@ class Message:
         try:
             self.selector.unregister(self.sock)
         except Exception as e:
-            print(
-                "error: selector.unregister() exception for",
-                f"{self.addr}: {repr(e)}",
+            logger.error(
+                "error: selector.unregister() exception for", f"{self.addr}: {repr(e)}"
             )
 
         try:
             self.sock.close()
         except OSError as e:
-            print(
-                "error: socket.close() exception for",
-                f"{self.addr}: {repr(e)}",
+            logger.error(
+                "error: socket.close() exception for", f"{self.addr}: {repr(e)}"
             )
         finally:
             # Delete reference to socket object for garbage collection

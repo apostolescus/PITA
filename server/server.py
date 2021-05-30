@@ -1,19 +1,26 @@
+"""This module should be run to start the PITA program from the server side.
+It will listen on the specified port for a connection and will check the client certification.
+Modifiy HOST and PORT to your server ip.
+If you want to use localhost for testing put HOST='127.0.0.1'.
+Don't forget to modify in the client side script too."""
+
 import socket
 import selectors
 import traceback
 import ssl
 
 import server_message
+from storage import config_file, logger
 
-HOST = "192.168.10.39"
-PORT = 65432
+HOST = config_file["SERVER"]["ip"]
+PORT = config_file["SERVER"].getint("port")
 
 selector = selectors.DefaultSelector()
 
 # declaring certificates locations
-server_cert = 'server_certificate/server.crt'
-server_key = 'server_certificate/server.key'
-client_certs = 'client_certificates/client.crt'
+server_cert = config_file["CERTIFICATES"]["server_cert"]
+server_key = config_file["CERTIFICATES"]["server_key"]
+client_certs = config_file["CERTIFICATES"]["client_cert"]
 
 # initialize listening socket
 listen_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -35,23 +42,19 @@ def add_connection(sock):
     context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
     context.verify_mode = ssl.CERT_REQUIRED
 
-    # load certificates 
+    # load certificates
     context.load_cert_chain(certfile=server_cert, keyfile=server_key)
-    
+
     # load client verification certificate
     context.load_verify_locations(cafile=client_certs)
 
     # accept connection
     newsocket, addr = sock.accept()
 
-    #newsocket.setblocking(False)
-
     # wrap in secure connection
     conn = context.wrap_socket(newsocket, server_side=True)
 
     # register connection
-    #conn.do_handshake()
-
     message = server_message.Message(selector, conn, addr)
     selector.register(conn, selectors.EVENT_READ, message)
 
@@ -67,13 +70,13 @@ try:
                 try:
                     message.process_message(mask)
                 except Exception:
-                    print(
+                    logger.error(
                         "main: error: exception for",
                         f"{message.addr}:\n{traceback.format_exc()}",
                     )
                     message.close()
 
 except KeyboardInterrupt:
-    print("caught keyboard interrupt, exiting")
+    logger.level("SERVER", "Keyboard interrupting, exiting ...")
 finally:
     selector.close()

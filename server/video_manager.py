@@ -1,19 +1,19 @@
-import cv2
-import time
 from threading import Lock
 from datetime import datetime
-
+import cv2
+from storage import config_file
 
 class VideoManagerSingleton:
 
-    # '''
-    # Singleton class manages low level image operations.
-    # Used with a wrapper above.
-    # time : by default 180 secs
-    # mu : False if time is in seconds, else True
-    # frame_size : modify depending on the camera
-    # FPS : modify depending on the frame size you obtain after camera processing
-    # '''
+    """
+    Singleton class manages low level image operations.
+    Used with a wrapper above.
+
+    time : by default 180 secs
+    mu : False if time is in seconds, else True
+    frame_size : modify depending on the camera
+    FPS : modify depending on the frame size you obtain after camera processing
+    """
 
     __instance = None
 
@@ -24,7 +24,7 @@ class VideoManagerSingleton:
         mu=False,
         # VERY IMPORTANT, VIDEO SAVING WON'T WORK WITHOUT
         # PROPER RESOLUTION
-        frame_size=(640, 480),
+        frame_size=(config_file["VIDEO"].getint("width"), (config_file["VIDEO"].getint("height")),
         FPS=8,
     ):
 
@@ -63,7 +63,7 @@ class VideoManagerSingleton:
         )
 
     def record(self, frame, long=False):
-      
+
         if self.buffer is None:
             self.buffer = [frame] * self.buffer_len
 
@@ -76,7 +76,6 @@ class VideoManagerSingleton:
                 self.check = True
         else:
             self.writer.write(frame)
-      
 
     def save(self, long=False):
 
@@ -97,18 +96,18 @@ class VideoManagerSingleton:
 def test():
 
     camera = cv2.VideoCapture(0)
-    videoManager = VideoManagerSingleton.getInstance()
+    video_manager = VideoManagerSingleton.getInstance()
 
     counter = 0
-    videoManager.set_name()
+    video_manager.set_name()
 
     while counter != 100:
         ret, frame = camera.read()
 
-        videoManager.record(frame, long=True)
+        video_manager.record(frame, long=True)
         counter += 1
 
-    videoManager.save(True)
+    video_manager.save(True)
     camera.release()
 
 

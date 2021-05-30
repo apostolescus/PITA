@@ -1,14 +1,37 @@
+import sys
 from threading import Thread, Event, Lock
 import copy
-import logging
+import configparser
+import loguru
+
+config_file = configparser.ConfigParser()
+config_file.read("server.config")
 
 lock = Lock()
 close = False
 switch_sound = False
 update_message = False
 
+# used to display times for all the processes
+timer = config_file["DEBUG"].getboolean("time")
+debug_mode = config_file["DEBUG"].getboolean("verbose")
+
 width = 640
 height = 480
+
+# initialize logger
+logger = loguru.logger
+logger.add(
+    'server_log.txt', level="DEBUG", format="{time}{level}{message}"
+)
+
+logger.level("IMAGE_DETECTOR", no=20, color="<blue>")
+logger.level("ALERTER", no=20, color="<red>")
+logger.level("VIDEO", no=15,color="<green>")
+logger.level("SERVER", no=16, color="<cyan>")
+logger.level("LANE_DETECTOR", no=16, color="<yellow>")
+
+logger.add(sys.stdout, format="{level.name}-{time}-{message}")
 
 def get_polygone(type):
     if type == "poly":
