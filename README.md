@@ -5,28 +5,42 @@ Python Intelligent Traffic Assistant
 
 ## **DON'T FORGET BACKUP**
 
-### - [ ] Convert scripts for raspbian
-
 ### **Server:** 
 - [x] send single image localhost basic connection
-- [ ] impelment UPDATE request
-- [ ] implement DETECT request
-- [ ] send multiple images localhost basic connection
-- [ ] add image detection 
-- [ ] add lane detection
+- [x] implement DETECT request
+- [x] send multiple images localhost basic connection
+- [x] add image detection 
+- [x] implement UPDATE request
+- [x] implement UPDATE backend 
+- [x] add traffic alert 
+- [x] add basic lane detection
+- [x] perform detection on GPU
+- [x] add encrypted communication using ceritificates
+- [x] allow both CPU/GPU detection
+- [x] added config file
+- [x] clean code
+- [ ] add traffic light/sempahores warning
 
 ### **Client:**
 - [x] establish localhost connection
-- [ ] implement capture-display pipeline
+- [x] implement capture-display pipeline
+- [x] add warning sound
+- [x] add encrypted communication using ceritificates
+- [x] convert script for raspbian
+- [x] add CONFIG file
+- [x] clean code
+- [x] add average capture-process-return time measurements
+- [ ] send polygone with first message
 
 ### **Coral TPU:**
  - [x] test tflite model
- - [ ] convert yolov4 lite model
+ - ~~[ ] convert yolov4 lite model~~
 
 ### **Lane detection:**
 - [x] add lane detector to pipeline
 - [x] perform basic lane detection
 - [x] add switch to GUI 
+- [x] use average line for short periods of time
 - [ ] compare to robust lane detection
 
 ### **GPS:**
@@ -36,39 +50,61 @@ Python Intelligent Traffic Assistant
 
 ### **Camera:**
 - [x] test with webCam
-- [x] recording modes
+- [x] fix recording mode
+- [x] permanent recording mode
 - [x] implement distance measurment
-- [ ] connect GPIO Camera
+- [x] smart recording mode
+- [x] start smart recording by default
+- [x] connect GPIO Camera
 - [ ] connect external screen
 
 ### **Network:**
 - [x] implement both tf and yolo detection
 - [x] add detection for TF lite
-- [ ] label other images
+- [x] label other images
+- [x] perform detection on GPU
 - [ ] train network
-- [ ] convert network
 
-### **Alerter: **
+### **Alerter:**
 - [x] alert only for vehicles on the same 
 lane
 - [x] add connection to Firebase
 - [x] make noise when in danger
-- [ ] send data to firebase when danger
+- [x] send data to firebase when danger
+- [x] save in redundancy database
 
-### **Others:**
-- [x] GUI
-- [x] Alert system
-- [ ] send information to firebase
-- [ ] add GUI button for update
+### **Mobile:**
+- [x] create GUI
+- [x] fetch data from firebase
+- [x] display alerts on mobile
+
+### **Other:**
+- [x] add logguru
+- [x] add alerts for other type of incidents
+- [x] show notification on GUI
+- [x] remove GUI button for update
+- [ ] add personalized sound for each alert
+
+### **Testing: **
+- [x] measure time using uuids
+- [x] test lane detection
+- [ ] test alert system (firebase, custom notifications)
+
+**Optional**:
+- [ ] improve lane detection
+- [ ] split gpu detection multithread
+- [ ] split lane/object detection multithread
+- [ ] add advanced lane detection
 - [ ] add mode for user to modify fix size time
 
 ### **Docs:**
 - [x] recording modes documentation
+- [x] sources organisation in directories
+- [ ] docs converting weights to tf
 - [ ] alert system documentation
 - [ ] distance measure documentation
 - [ ] lane detection
-- [ ] code cleaning
-- [ ] sources organisation in directories
+
 
 ## Image Detector
 
@@ -198,4 +234,17 @@ The camera will record the last X seconds/minutes (X being the set period).
 
 
 
+### Server-Client Latency
 
+On a wifi from a mobile device the latency between server and client is 200 milisenconds.
+This mean that the picture taken by the device travels for about 0.12 s to the server and the response for about 0.7 s back to the device. The difference is explained by the size of the picture send compared to the one of the bounding boxes arrays ( sever times bigger).
+Given a server processing time by around: 0.2 seconds ( on a CPU with tiny-yolo), the average trip time would be around 0.4s.
+Given the human reaction time of 0.2-0.25s , the total capture-process-react time is aroung 0.6 seconds.
+If we go one step futher and we consider the spreading of 5G networks in the following years, the latency of the comunication could be reduce to 0.1s.
+
+***For 4G, this is 200 milliseconds, not far off the 250 milliseconds it takes for humans to react to visual stimuli. The 5G latency rate is significantly lower: at just 1 millisecond.*** 
+
+**ThalesGroup: "5G vs 4G: what’s the difference?"**
+
+Futher, if we integrate our system directly with the car and reduce human latency, the total time could be around 0.2-0.25 s( on a CPU). If we use a GPU for image detection and a more powerful computer, the total time could go as small as **0.1-0.15 seconds**. Almost half as the human reaction time.
+Until futher tehnical upgrades, the system can be used as an auxiliar preventive one, in case the person is not paying attention to the road.
