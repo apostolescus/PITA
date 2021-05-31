@@ -70,9 +70,9 @@ try:
                 try:
                     message.process_message(mask)
                 except Exception:
-                    logger.error(
-                        "main: error: exception for",
-                        f"{message.addr}:\n{traceback.format_exc()}",
+                    logger.exception(
+                        "main: error: exception for" +
+                        str(message.addr)
                     )
                     message.close()
 

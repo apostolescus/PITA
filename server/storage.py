@@ -26,12 +26,10 @@ logger.add(
 )
 
 logger.level("IMAGE_DETECTOR", no=20, color="<blue>")
-logger.level("ALERTER", no=20, color="<red>")
+logger.level("ALERTER", no=20, color="<magenta>")
 logger.level("VIDEO", no=15,color="<green>")
 logger.level("SERVER", no=16, color="<cyan>")
 logger.level("LANE_DETECTOR", no=16, color="<yellow>")
-
-logger.add(sys.stdout, format="{level.name}-{time}-{message}")
 
 def get_polygone(type):
     if type == "poly":

@@ -20,12 +20,12 @@ class VideoManagerSingleton:
     # modify default frame size (depends on camera)
     @staticmethod
     def getInstance(
-        time=10,
-        mu=False,
+        time=3,
+        mu=True,
         # VERY IMPORTANT, VIDEO SAVING WON'T WORK WITHOUT
         # PROPER RESOLUTION
-        frame_size=(config_file["VIDEO"].getint("width"), (config_file["VIDEO"].getint("height")),
-        FPS=8,
+        frame_size=(640, 480),
+        FPS=30,
     ):
 
         if VideoManagerSingleton.__instance == None:
@@ -34,7 +34,7 @@ class VideoManagerSingleton:
 
     def __init__(self, time, mu, frame_size, FPS):
 
-        self.directory_name = "recordings/"
+        self.directory_name = config_file["VIDEO"]["saving_directory"]
         self.time = time
         self.lock = Lock()
         self.FPS = FPS

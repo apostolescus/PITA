@@ -87,7 +87,7 @@ class Alerter:
                 RecordStorage.mode = record_mode
                 self.video_manager.start()
 
-        logger.info("Data succesfully updated")
+        logger.log("ALERTER", "Data succesfully updated")
 
     def check_safety(self, detected_result):
         """Method that checks if the driver is at a safe distance.
@@ -121,7 +121,8 @@ class Alerter:
                     for object_distance in sorted_distances:
                         if max_distance > object_distance[0]:
 
-                            logger.info(
+                            logger.log(
+                                "ALERTER",
                                 "Danger detected, more than 80% procent overlaping"
                             )
 
@@ -140,7 +141,7 @@ class Alerter:
                                 self.alerts["frontal_collision"] = time.time()
 
                             if not RecordStorage.start_smart:
-                                logger.info("Smart Record Started")
+                                logger.log("ALERTER","Smart Record Started")
                                 RecordStorage.start_smart = True
                                 self.record_delay = time.time()
                             else:
@@ -180,7 +181,7 @@ class Alerter:
 
         # check if it is still recording for more than 2 seconds
         if RecordStorage.start_smart and (time.time() - self.record_delay > 2):
-            logger.info("Smart Record Stopped")
+            logger.log("ALERTER", "Smart Record Stopped")
             RecordStorage.start_smart = False
 
     def _calculate_max_distance(self, speed):
@@ -205,7 +206,7 @@ class Alerter:
 
         self.firebase_app.post("drivingInfos/", data)
         self.firebase_app.post("backup_driver_infos", data)
-        logger.info("Data added to firebase")
+        logger.log("ALERTER", "Data added to firebase")
 
 
 # def test():

@@ -81,7 +81,7 @@ class LaneDetectorThread(StoppableThread):
 
                 if timer:
                     end_time = time.time()
-                    logger.level(
+                    logger.log(
                         "LANE_DETECTOR",
                         "Total lane det time: " + str(end_time - start_time),
                     )
@@ -102,8 +102,8 @@ class ImageObjectDetectorThread(StoppableThread):
         self.detection_mode = config_file["DETECTION"]["mode"]
         self.labels = config_file["DETECTION"]["labels"]
         self.avg_size_csv = config_file["DETECTION"]["avg_file"]
-        self.confidence = config_file["DETECTION"]["confidence"]
-        self.threshold = config_file["DETECTION"]["threshold"]
+        self.confidence = config_file["DETECTION"].getfloat("confidence")
+        self.threshold = config_file["DETECTION"].getfloat("threshold")
 
     def run(self):
 
@@ -131,7 +131,7 @@ class ImageObjectDetectorThread(StoppableThread):
 
             if timer:
                 end = time.time()
-                logger.level("IMAGE_DETECTOR", "detection time is: " + str(end - start))
+                logger.log("IMAGE_DETECTOR", "detection time is: " + str(end - start))
 
             if lane_detection:
                 # print("-- image detector --- putting in Lane Detection Queue")
@@ -177,15 +177,15 @@ class Message:
         """Set selector to listen for events: mode is 'r', 'w', or 'rw'."""
         if mode == "r":
             if debug_mode:
-                logger.level("SERVER", "Server switched to read mode")
+                logger.log("SERVER", "Server switched to read mode")
             events = selectors.EVENT_READ
         elif mode == "w":
             if debug_mode:
-                logger.level("SERVER", "Server switched to write mode")
+                logger.log("SERVER", "Server switched to write mode")
             events = selectors.EVENT_WRITE
         elif mode == "rw":
             if debug_mode:
-                logger.level("SERVER", "Server switched to read/write mode")
+                logger.log("SERVER", "Server switched to read/write mode")
             events = selectors.EVENT_READ | selectors.EVENT_WRITE
         else:
             logger.error(f"Invalid events mask mode {repr(mode)}.")
@@ -252,7 +252,7 @@ class Message:
         dictionary = {}
 
         if debug_mode:
-            logger.level("SEVER", "Processing Results")
+            logger.log("SEVER", "Processing Results")
 
         if lane_detection:
             lines = self._results[2]
@@ -316,15 +316,18 @@ class Message:
             # the full message was received
             # process the content
 
+            # extract the uuid from request
+            self._uuid = self.json_header["uuid"]
+
             if self.json_header["request-type"] == "DETECT":
-                # self._uuid = self.json_header["uuid"]
+
                 if timer:
                     global average_time, average_time_counter
                     send_time = self.json_header["time"]
                     dif = time.time() - send_time
 
                     if average_time_counter > 100:
-                        logger.level(
+                        logger.log(
                             "SERVER",
                             "Average time is: "
                             + str(average_time / average_time_counter),
@@ -333,7 +336,7 @@ class Message:
                         average_time += dif
                         average_time_counter += 1
 
-                    logger.level("From client to server: " + str(dif))
+                    logger.log("SERVER", "From client to server: " + str(dif))
 
                 # print(str(time.time()- self.json_header["time"]))
 
@@ -363,7 +366,7 @@ class Message:
             elif self.json_header["request-type"] == "UPDATE":
 
                 if debug_mode:
-                    logger.level("SERVER", "update request")
+                    logger.log("SERVER", "update request")
 
                 update_mode = self.json_header["update"]
 
@@ -392,7 +395,7 @@ class Message:
                     lane_det = self.json_header["lane"]
 
                     if debug_mode:
-                        logger.level("SERVER", "Lane detector is: " + str(lane_det))
+                        logger.log("SERVER", "Lane detector is: " + str(lane_det))
 
                     if lane_det:
                         if lane_detection is False:
@@ -402,7 +405,7 @@ class Message:
                         if lane_detection:
                             for thread in threading.enumerate():
                                 if thread.name == "lane_detector":
-                                    logger.level("SERVER", "Stopping Lane Detector")
+                                    logger.log("SERVER", "Stopping Lane Detector")
                                     thread.join()
 
                             lane_detection = False
@@ -423,12 +426,14 @@ class Message:
                 "response-type": "DETECTED",
                 "content-len": len(encoded_response),
                 "time": time.time(),
+                "uuid":self._uuid
             }
         # no object was detected
         else:
             header = {
                 "time": time.time(),
                 "response-type": "EMPTY",
+                "uuid":self._uuid
             }
 
         encoded_header = self._json_encode(header)
@@ -445,7 +450,7 @@ class Message:
             try:
                 sent = self.sock.send(self._send_buffer)
                 if debug_mode:
-                    logger.level("SERVER", "Sended: " + str(sent))
+                    logger.log("SERVER", "Sended: " + str(sent))
                 self._request_done = False
             except BlockingIOError:
                 pass
@@ -453,11 +458,11 @@ class Message:
                 self._send_buffer = self._send_buffer[sent:]
         else:
             if debug_mode:
-                logger.level("SERVER", "No content in send buffer")
+                logger.log("SERVER", "No content in send buffer")
 
     def write(self):
         if debug_mode:
-            logger.level("SERVER", "Writing to client")
+            logger.log("SERVER", "Writing to client")
 
         if self._request_done is False:
             self._generate_request()

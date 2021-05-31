@@ -17,8 +17,9 @@ Python Intelligent Traffic Assistant
 - [x] perform detection on GPU
 - [x] add encrypted communication using ceritificates
 - [x] allow both CPU/GPU detection
+- [x] added config file
+- [x] clean code
 - [ ] add traffic light/sempahores warning
-
 
 ### **Client:**
 - [x] establish localhost connection
@@ -28,6 +29,7 @@ Python Intelligent Traffic Assistant
 - [x] convert script for raspbian
 - [x] add CONFIG file
 - [x] clean code
+- [x] add average capture-process-return time measurements
 - [ ] send polygone with first message
 
 ### **Coral TPU:**
@@ -38,6 +40,7 @@ Python Intelligent Traffic Assistant
 - [x] add lane detector to pipeline
 - [x] perform basic lane detection
 - [x] add switch to GUI 
+- [x] use average line for short periods of time
 - [ ] compare to robust lane detection
 
 ### **GPS:**
@@ -76,13 +79,18 @@ lane
 - [x] display alerts on mobile
 
 ### **Other:**
-- [ ] add logguru
-- [ ] add alerts for other type of incidents
-- [ ] show notification on GUI
+- [x] add logguru
+- [x] add alerts for other type of incidents
+- [x] show notification on GUI
 - [x] remove GUI button for update
+- [ ] add personalized sound for each alert
+
+### **Testing: **
+- [x] measure time using uuids
+- [x] test lane detection
+- [ ] test alert system (firebase, custom notifications)
 
 **Optional**:
-
 - [ ] improve lane detection
 - [ ] split gpu detection multithread
 - [ ] split lane/object detection multithread
@@ -91,11 +99,12 @@ lane
 
 ### **Docs:**
 - [x] recording modes documentation
+- [x] sources organisation in directories
+- [ ] docs converting weights to tf
 - [ ] alert system documentation
 - [ ] distance measure documentation
 - [ ] lane detection
-- [ ] code cleaning
-- [x] sources organisation in directories
+
 
 ## Image Detector
 

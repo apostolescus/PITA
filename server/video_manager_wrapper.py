@@ -2,7 +2,7 @@ import threading
 import cv2
 
 from video_manager import VideoManagerSingleton
-from storage import RecordStorage, logger
+from storage import RecordStorage, logger, config_file
 
 
 class VideoManagerWrapper:
@@ -21,7 +21,14 @@ class VideoManagerWrapper:
         return VideoManagerWrapper.__instance
 
     def __init__(self):
-        self.vm = VideoManagerSingleton.getInstance()
+        fps = config_file["VIDEO"].getint("FPS")
+        width = config_file["VIDEO"].getint("width")
+        height = config_file["VIDEO"].getint("height")
+        record_time = config_file["VIDEO"].getint("record_time")
+
+        self.vm = VideoManagerSingleton.getInstance(
+            time=record_time, frame_size=(width, height), FPS=fps
+        )
         self.lock = threading.Lock()
 
     def safe_enter(self):
@@ -39,7 +46,6 @@ class VideoManagerWrapper:
             if RecordStorage.mode == 0:
                 # and objcct is detected close enough
                 if RecordStorage.start_smart:
-                    logger.level("VIDEO", "Smart mode Started")
                     self.vm.record(frame, True)
             # if permanent mode enable
             elif RecordStorage.mode == 1:
@@ -52,7 +58,6 @@ class VideoManagerWrapper:
 
     def start(self):
         self.safe_enter()
-        logger.level("VIDEO", "Video Manager Started recording")
         RecordStorage.recording = True
 
         self.vm.set_name()
@@ -60,7 +65,6 @@ class VideoManagerWrapper:
         self.safe_exit()
 
     def stop(self):
-        logger.level("VIDEO", "Video Manager Stopped recording")
         self.safe_enter()
 
         check = True
@@ -76,7 +80,7 @@ class VideoManagerWrapper:
         save_thread = threading.Thread(target=self.vm.save, args=(check,))
         save_thread.start()
 
-        logger.level("VIDEO", "Video Saved")
+        logger.log("VIDEO", "Video Saved")
         self.safe_exit()
 
     def start_smart(self):

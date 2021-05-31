@@ -4,6 +4,7 @@ import time
 import io
 import base64
 from threading import Thread
+import uuid
 
 import selectors
 import json
@@ -29,9 +30,9 @@ notify2.init('PITA')
 counter = config_file["DEBUG"].getint("video_frames")
 DEBUG = bool(config_file["DEBUG"].getboolean("verbose"))
 TIME = bool(config_file["DEBUG"].getboolean("time"))
-average_time = 0
-average_time_counter = 0
 
+# measure total travel time
+uuid_dict = {}
 
 def play_sound():
     playsound("alert_sounds/beep.mp3")
@@ -49,6 +50,10 @@ class Message:
         self._send_buffer = b""
         self._recv_buffer = b""
         self._current_image = None
+
+        # used for time measurements
+        self._average_time = 0
+        self._average_time_counter = 0
 
         # only for lane detection comparision
         if counter != 0:
@@ -113,6 +118,10 @@ class Message:
 
         msg: str = ""
 
+        # generate and add unique id to dictionary
+        unique_id = uuid.uuid4()
+        uuid_dict[str(unique_id)] = time.time()
+
         if DEBUG:
             print("--- generate_request --- entered in generate request")
 
@@ -135,6 +144,7 @@ class Message:
                     "experience": UISelected.experience,
                     "record_mode": UISelected.rec_mode,
                     "reaction_time": UISelected.reaction_time,
+                    "uuid":str(unique_id),
                 }
                 UISelected.updated = False
             else:
@@ -143,6 +153,7 @@ class Message:
                     "update": 0,
                     "time": time.time(),
                     "lane": UISelected.lane_detection,
+                    "uuid":str(unique_id),
                 }
 
             # update lane detection
@@ -175,7 +186,7 @@ class Message:
                 "speed": gps_speed,
                 "lat": gps_lat,
                 "lon": gps_lon,
-                # "uuid":str(uuid.uuid4()),
+                "uuid":str(unique_id),
                 "content-len": len(content),
             }
 
@@ -258,6 +269,19 @@ class Message:
     def _process_request(self):
 
         json_type = self.json_header["response-type"]
+        uuid = self.json_header["uuid"]
+
+
+        if TIME:
+
+            start_time = uuid_dict[uuid]
+            current_time = time.time()
+            self._average_time = self._average_time + (current_time - start_time)
+            self._average_time_counter += 1
+
+            if self._average_time_counter%100 == 0:
+                logger.info("Average time in " + str(self._average_time_counter) + " messages: " + 
+                str(current_time - start_time))
 
         if DEBUG:
             logger.debug("--- main_thread --- processing request")
@@ -273,26 +297,12 @@ class Message:
             self._set_selector_events_mask("w")
 
         elif json_type == "DETECTED":
-            global average_time, average_time_counter
 
             if DEBUG:
                 logger.debug("--- main_thread --- detected request")
 
             self._request_done = False
             content_len = self.json_header["content-len"]
-
-            if TIME:
-                send_time = self.json_header["time"]
-                dif = time.time() - send_time
-                if average_time_counter > 100:
-                    logger.info(
-                        "average time is: ", average_time / average_time_counter
-                    )
-
-                else:
-                    average_time += dif
-                    average_time_counter += 1
-                logger.info("From server to client: ", str(dif))
 
             if len(self._recv_buffer) >= content_len:
 
@@ -315,14 +325,19 @@ class Message:
         obj_list = response["detected_objects"]
         danger = response["danger"]
         line = response["lines"]
-        alerts = response["alerts"]
 
-        # display alerts
-        if alerts:
-            for alert in alerts:
-                n = notify2.Notification('ALERT', alert)
-                n.show()
-                time.sleep(0.2)
+        try:
+            alerts = response["alerts"]
+            
+            # display alerts
+            if alerts:
+                for alert in alerts:
+                    n = notify2.Notification('ALERT', alert)
+                    n.show()
+                    time.sleep(0.2)
+
+        except KeyError:
+            pass
 
         switch_sound = get_switch_sound()
         if danger == 1 and switch_sound:

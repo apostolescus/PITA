@@ -12,6 +12,7 @@ from kivy.clock import Clock
 from kivy.uix.screenmanager import Screen
 from kivy.uix.boxlayout import BoxLayout
 from kivy.graphics.texture import Texture
+from kivy.config import Config
 
 # import local dependencies
 from camera_manager import CameraManagerSingleton
@@ -177,5 +178,8 @@ class CameraApp(App):
 
 class GUIManagerThread(StoppableThread):
     def run(self):
+        Config.set('graphics', 'fullscreen', 'auto')
+        Config.set('graphics', 'window_state', 'maximized')
+        Config.write()
         gui = CameraApp()
         gui.run()
