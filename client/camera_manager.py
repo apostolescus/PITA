@@ -40,7 +40,7 @@ class CameraManagerSingleton:
         frame_shape = frame.shape
 
         if ret is True:
-            if frame_shape[0] > self.height or frame_shape[1] > self.width:
+            if frame_shape[0] != self.height or frame_shape[1] != self.width:
                 resized = cv2.resize(
                     frame, (self.width, self.height), interpolation=cv2.INTER_AREA
                 )

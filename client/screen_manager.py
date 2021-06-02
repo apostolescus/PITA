@@ -1,6 +1,7 @@
 import os
+import time
 from threading import enumerate
-from queue import Queue
+from queue import Queue, Empty
 
 # other libraries
 import psutil
@@ -17,8 +18,9 @@ from kivy.config import Config
 # import local dependencies
 from camera_manager import CameraManagerSingleton
 from storage import UISelected, StoppableThread
-from storage import toggle_update_message
-from storage import toggle_switch_sound, config_file
+from storage import toggle_update_message, last_alert_queue
+from storage import toggle_switch_sound, config_file, get_gps_infos
+from storage import alerter_dictionary, alerter_color
 
 # Queues for pipeline
 captured_image_queue = Queue(1)
@@ -27,6 +29,9 @@ result_queue = Queue(1)
 # global variables
 switch = False
 
+# update_speed
+last_speed_update_time = 0
+SPEED_UPDATE_INTERVAL = config_file["GPS"].getfloat("update_interval")
 
 class Display(BoxLayout):
     def __init__(self, **kwargs):
@@ -46,7 +51,7 @@ class Screen_One(Screen):
 
     def update(self, dt):
         """ Captures image from cameraManager and puts it in pipeline"""
-        global captured_image_queue, result_queue
+        global captured_image_queue, result_queue, last_speed_update_time
 
         frame = self.capture.get_frame()
 
@@ -55,6 +60,51 @@ class Screen_One(Screen):
             captured_image_queue.put_nowait(frame)
         except:
             pass
+        
+        # fetch and display alerts
+        try:
+            last_alert = last_alert_queue.get_nowait()
+
+            # # get alert description from dictionary
+            # try:
+            #     alert_description = alerter_dictionary[last_alert]
+            # except:
+            #     alert_description = last_alert
+
+            #self.ids.alert_label.text = last_alert
+
+            # get coresponding alert color
+            # try:
+            #     alert_color = alerter_color[last_alert]
+                
+            #     # danger - red color
+            #     if alert_color == 2:
+            #         alert_color = [33, 210, 202,1]
+            #     # pay attention - yellow color
+            #     elif alert_color == 1:
+            #         alert_color = [3, 3, 255,1]
+            #     # informative detection - blue
+            #     else:
+            #         alert_color = [252, 3, 3, 1]
+            # except:
+            #     alert_color = [252, 3, 3, 1]
+            
+            # self.ids.alert_label.color = alert_color
+
+        except Empty:
+            pass
+        
+        # get speed each x seconds
+        # if time.time() - last_speed_update_time > SPEED_UPDATE_INTERVAL:
+        #     speed = get_gps_infos()[0]
+        #     last_speed_update_time = time.time()
+
+        #     if speed > 120:
+        #         self.ids.speed.color = [33, 210, 202,1]
+        #         self.ids.speed.text = str(speed)
+        #     else:
+        #         self.ids.speed.color = [3, 3, 255,1]
+        #         self.ids.speed.text = str(speed)
 
         # display processed image
         try:

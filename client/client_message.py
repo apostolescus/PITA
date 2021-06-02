@@ -18,6 +18,7 @@ from playsound import playsound
 from screen_manager import captured_image_queue, result_queue
 from storage import toggle_update_message, get_update_message, config_file
 from storage import UISelected, get_switch_sound, get_gps_infos, logger
+from storage import last_alert_queue
 
 # globals
 lane_detection = False
@@ -33,6 +34,7 @@ TIME = bool(config_file["DEBUG"].getboolean("time"))
 
 # measure total travel time
 uuid_dict = {}
+
 
 def play_sound():
     playsound("alert_sounds/beep.mp3")
@@ -54,6 +56,10 @@ class Message:
         # used for time measurements
         self._average_time = 0
         self._average_time_counter = 0
+
+        #delay time to send message
+        self._last_message = 0
+        self._last_response = 0
 
         # only for lane detection comparision
         if counter != 0:
@@ -86,26 +92,17 @@ class Message:
 
         if mode == "r":
             if DEBUG:
-                logger.log(
-                    leve="DEBUG",
-                    message="---main thread--- client switched to listen mode",
-                )
+                logger.debug("---main thread--- client switched to listen mode")
             events = selectors.EVENT_READ
 
         elif mode == "w":
             if DEBUG:
-                logger.log(
-                    leve="DEBUG",
-                    message="---main thread--- client switched to write mode",
-                )
+                logger.debug("---main thread--- client switched to write mode")
             events = selectors.EVENT_WRITE
 
         elif mode == "rw":
             if DEBUG:
-                logger.log(
-                    leve="DEBUG",
-                    message="---main thread--- client switched to read/write mode",
-                )
+                logger.debug("---main thread--- client switched to read/write mode")
             events = selectors.EVENT_READ | selectors.EVENT_WRITE
 
         else:
@@ -115,7 +112,6 @@ class Message:
 
     def _generate_request(self):
         """Method that generates a request for the server."""
-
         msg: str = ""
 
         # generate and add unique id to dictionary
@@ -271,7 +267,6 @@ class Message:
         json_type = self.json_header["response-type"]
         uuid = self.json_header["uuid"]
 
-
         if TIME:
 
             start_time = uuid_dict[uuid]
@@ -328,13 +323,10 @@ class Message:
 
         try:
             alerts = response["alerts"]
-            
             # display alerts
             if alerts:
                 for alert in alerts:
-                    n = notify2.Notification('ALERT', alert)
-                    n.show()
-                    time.sleep(0.2)
+                    last_alert_queue.put(alert)
 
         except KeyError:
             pass
@@ -424,6 +416,7 @@ class Message:
 
     def read(self):
         """ Main function for reading and processing a message"""
+
         self._read()
 
         if self._read_header:
@@ -431,7 +424,8 @@ class Message:
             self._process_header()
 
         self._process_request()
-
+        
+        
     def close(self):
 
         logger.info("Closing connection ...")

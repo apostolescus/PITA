@@ -49,6 +49,7 @@
 	spacing : 5
 	font_family: 'Regular'
 	on_press : 
+	
 <Display>:
     canvas.before:
         Color:
@@ -145,6 +146,35 @@
                 Switch:
                     id: switch
                     on_active: app.switch_callback()
+            BoxLayout:
+                orientation: 'vertical'
+                spacing:10
+                spacing:10
+                Label:
+                    text:'Last Alert'
+                    font_size: 20
+                    font_name: font_bold
+                Label:
+                    id: alert_label
+                    font_size: 25
+                    font_name: font_bold
+                    text: 'red semaphore'
+
+            BoxLayout:
+                orientation: 'vertical'
+                spacing:10
+                spacing:10
+                Label:
+                    text:'Speed'
+                    font_size: 20
+                    font_name: font_bold
+                Label:
+                    id: speed
+                    font_size: 20
+                    font_name: font_bold
+                    color: [252, 3, 3, 1]
+                    text: 'speed'
+
 
 
 <Screen_Two>:

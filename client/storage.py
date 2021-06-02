@@ -7,12 +7,60 @@ import loguru
 lock = Lock()
 gps_lock = Lock()
 gps_queue = Queue()
+last_alert_queue = Queue(1)
 
 switch_sound = False
 update_message = False
 
 config_file = configparser.ConfigParser()
 config_file.read("config.file")
+
+# alerter dictionary
+alerter_dictionary = {
+    "frontal_collision": "Frontal Colision",
+    "priority": "Priority Sign",
+    "keep-right": "Keep-Right Sign",
+    "stop": "Stop",
+    "curve-right": "Curve-Right",
+    "parking": "Parking Sign Detected",
+    "curve-left": "Curve-Left",
+    "no-entry": "No entry sign detected",
+    "pedestrians": "Pedestrians sign detected",
+    "give-way": "Give way sign detected",
+    "bike": "Bike",
+    "bus": "Bus",
+    "car": "Car",
+    "person": "Person",
+    "motorbike": "Motorbike",
+    "green": "Green semaphore",
+    "red": "Red semaphore",
+    "red-left": "Red semaphore left",
+    "truck": "Truck",
+}
+
+alerter_color = {
+    "frontal_collision": 2,
+    "priority": 0,
+    "keep-right": 1,
+    "stop": 2,
+    "curve-right": 1,
+    "parking": 0,
+    "curve-left": 1,
+    "no-entry": 2,
+    "pedestrians": 1,
+    "give-way": 2,
+    "bike": 0,
+    "bus": 0,
+    "car":0,
+    "person":0,
+    "motorbike": 0,
+    "green": 0,
+    "red": 2,
+    "red-left": 2,
+    "truck": 0,
+}
+
+alerter_priority = {"frontal_collision": 100, "stop": 98, "red": 99, "no-entry": 97}
 
 # store last gps data
 old_gps_value: list = [0, 0, 0]

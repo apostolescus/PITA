@@ -7,7 +7,7 @@ time_rate = 0.01
 
 class GPS(StoppableThread):
     def __init__(self, name):
-        self.speed: int = 90
+        self.speed: int = 190
         self.lock = Lock()
         StoppableThread.__init__(self, name=name)
 

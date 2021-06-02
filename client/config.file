@@ -1,6 +1,6 @@
 [VIDEO]
 mode = video
-path = ../video/good.mp4
+path = ../video/city_drive_through.mp4
 width = 640
 height = 480
 update = 30
@@ -20,7 +20,7 @@ reaction_time = 0.5
 file = log.file
 
 [SERVER]
-ip = 194.61.20.246
+ip = 10.13.0.200
 port = 65432
 
 [CERTIFICATES]
@@ -28,6 +28,9 @@ client_cert = client_certificates/client.crt
 server_cert = server_certificate/server.crt
 client_key = client_certificates/client.key
 hostname = pita
+
+[GPS]
+update_interval = 2
 
 [DETECTION]
 points = [asda]
