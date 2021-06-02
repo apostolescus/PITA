@@ -6,23 +6,24 @@ import argparse
 import cv2
 import os, sys
 import csv
-import pandas as pd
-import tensorflow as tf
+# import pandas as pd
+# import tensorflow as tf
 from shapely.geometry import Polygon
+from darknet import *
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+# os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 from storage import DetectedPipeline
 from storage import get_polygone, logger, timer
 
-from yolov3.utils import (
-    detect_image,
-    detect_realtime,
-    detect_video,
-    Load_Yolo_model,
-    detect_video_realtime_mp,
-)
-from yolov3.configs import *
+# from yolov3.utils import (
+#     detect_image,
+#     detect_realtime,
+#     detect_video,
+#     Load_Yolo_model,
+#     detect_video_realtime_mp,
+# )
+# from yolov3.configs import *
 
 
 class DetectedObject:
@@ -52,6 +53,7 @@ class ImageDetector:
         config_file,
         mode="CPU",
         labels="yolo-files/coco.names",
+        data_file="yolo-files/coco.data",
         average_size="yolo-files/average_size.csv",
         confidence=0.5,
         threshold=0.3,
@@ -78,11 +80,10 @@ class ImageDetector:
         elif mode == "GPU":
             log_text("GPU mode")
             self.mode = 1
-            self.yolo = Load_Yolo_model()
-            self.input_size = 608
-            self.score_threshold = threshold
-            self.iou_threshold = 0.4
-
+            self.network, self.class_names, class_colors = load_network(config_file, data_file, weights)
+            self.network_width = network_width(self.network)
+            self.network_height = network_height(self.network)
+            
         self.det_time = 0
         self.pre_time = 0
         self.pro_time = 0
@@ -111,6 +112,9 @@ class ImageDetector:
         self.colors = np.random.randint(
             0, 255, size=(len(self.labels), 3), dtype="uint8"
         )
+
+
+
 
     def _get_distances(self, mode, detected_list, height, width):
         """ Calculates distances and checks if vehicles in front """
@@ -242,6 +246,7 @@ class ImageDetector:
                 for i in idxs.flatten():
                     label = self.labels[classIDs[i]]
                     color = [int(c) for c in self.colors[classIDs[i]]]
+
                     detected_object = DetectedObject(
                         classIDs[i], confidences[i], boxes[i], label, color
                     )
@@ -249,66 +254,59 @@ class ImageDetector:
 
         # GPU detection
         else:
-            cv2_im = image
-            original_frame = cv2.cvtColor(cv2_im, cv2.COLOR_BGR2RGB)
+            start_time = time.time()
+            detections, width_ratio, height_ratio = self._detect_gpu(image)
+            end_time = time.time()
 
-            if timer:
-                preprocessing_start = time.time()
 
-            # preprocess image
-            image_data = image_preprocess(
-                np.copy(original_frame), [self.input_size, self.input_size]
-            )
-            image_data = image_data[np.newaxis, ...].astype(np.float32)
+            for label, conf, bboxes in detections:
+                boxes = []
 
-            if timer:
-                preprocessing_end = time.time()
+                class_id = int(self.labels.index(label))
+                confidence = float(conf)
 
-            # predict objects
-            batched_input = tf.constant(image_data)
-            result = self.yolo(batched_input)
+                if confidence >= self.confidence:
+                    box = bboxes * np.array([width_ratio, height_ratio, width_ratio, height_ratio])
+                    centerX, centerY, w, h = box.astype("int")
 
-            pred_bbox = []
-            for key, value in result.items():
-                value = value.numpy()
-                pred_bbox.append(value)
+                    x = int(centerX - (w/2))
+                    y = int(centerY - (h/2))
 
-            pred_bbox = [tf.reshape(x, (-1, tf.shape(x)[-1])) for x in pred_bbox]
-            pred_bbox = tf.concat(pred_bbox, axis=0)
+                    boxes.append(x)
+                    boxes.append(y)
+                    boxes.append(int(w))
+                    boxes.append(int(h))
 
-            if timer:
-                post_process_start = time.time()
+                    color = [int(c) for c in self.colors[class_id]]
 
-            bboxes = postprocess_boxes(
-                pred_bbox, original_frame, self.input_size, self.score_threshold
-            )
-            bboxes = nms(bboxes, self.iou_threshold, method="nms")
+                    detected_object = DetectedObject(
+                        class_id, confidence, boxes, label, color
+                    )
+                    detected_objects.append(detected_object)
 
-            if timer:
-                post_process_end = time.time()
-                print("Pre processing time: ", preprocessing_end - preprocessing_start)
-                print("Detection time: ", post_process_start - preprocessing_end)
-                print("Post process time: ", post_process_end - post_process_start)
-
-            for i, bbox in enumerate(bboxes):
-                class_id = int(bbox[5])
-                label = self.labels[class_id]
-                color = [int(c) for c in self.colors[class_id]]
-                confidence = bbox[4].item()
-                boxes = bbox[:4].tolist()
-
-                boxes[2] = int(boxes[2] - boxes[0])
-                boxes[3] = int(boxes[3] - boxes[1])
-                boxes[0] = int(boxes[0])
-                boxes[1] = int(boxes[1])
-
-                detected_object = DetectedObject(
-                    class_id, confidence, boxes, label, color
-                )
-
-                detected_objects.append(detected_object)
+            final_end_time = time.time()
 
         return detected_objects
+    
+    def _detect_gpu(self, image):
+
+        darknet_image = make_image(self.network_width, self.network_height, 3)
+        img_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        img_resized = cv2.resize(img_rgb, (self.network_width, self.network_height),
+                            interpolation=cv2.INTER_LINEAR)
+        
+        # get image ratios to conver bbx to proper size
+
+        image_height, image_width, _ = image.shape
+        width_ratio = image_width/self.network_width
+        height_ratio = image_height/self.network_height
+
+        # run model on darknet style image to get detections
+        copy_image_from_bytes(darknet_image, img_resized.tobytes())
+        detections = detect_image(self.network, self.class_names, darknet_image)
+        free_image(darknet_image)
+
+        return detections, width_ratio, height_ratio
 
     def _get_distance(self, item_id, width, height, focal_length=596) -> float:
         """
@@ -534,4 +532,4 @@ def test_gpu():
 
 
 # test_gpu()
-# test()
+#test()

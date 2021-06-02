@@ -89,14 +89,14 @@ class Alerter:
 
         logger.log("ALERTER", "Data succesfully updated")
 
-    def check_safety(self, detected_result):
+    def check_safety(self, detection_results, gps_infos):
         """Method that checks if the driver is at a safe distance.
         If not returns a danger signal and client alerts the driver"""
 
-        detected_results = detected_result[1]
+        detected_results = detection_results
 
         # get speed from GPS
-        gps_infos = detected_result[2]
+        gps_infos = gps_infos
 
         speed = gps_infos[0]
         lat = gps_infos[1]
@@ -130,15 +130,15 @@ class Alerter:
 
                             # uploading to firebase
                             self._upload_to_firebase(
-                                "frontal_colision", speed, time.time(), 1, lat, lon
+                                "frontal_collision", speed, time.time(), 1, lat, lon
                             )
 
                             if "frontal_collision" in self.alerts:
                                 if time.time() - self.alerts["frontal_collision"] > 2:
-                                    self.alerts["frontal_collision"] = time.time()
-                                    detected_results.alerts.append("frontal_collision")
+                                    self.alerts['frontal_collision'] = time.time()
+                                    detected_results.alerts.append('frontal_collision')
                             else:
-                                self.alerts["frontal_collision"] = time.time()
+                                self.alerts['frontal_collision'] = time.time()
 
                             if not RecordStorage.start_smart:
                                 logger.log("ALERTER","Smart Record Started")
@@ -208,6 +208,26 @@ class Alerter:
         self.firebase_app.post("backup_driver_infos", data)
         logger.log("ALERTER", "Data added to firebase")
 
+
+def test_upload_to_firebase():
+
+    import random
+
+    alerters = ["priority", "keep-right", "stop", "curve-right" ,"parking", "curve-left", "no-entry", "pedestrians", "give-way", "bike", "bus", "car", "person", "motorbike",
+    "green", "red", "red-left", "truck"]
+
+    alerter = Alerter([(340, 1800 - 150), (920, 550), (1570, 1800 - 150)])
+
+    for i in range(0,10):
+        alert = random.choice(alerters)
+        current_time = time.time()
+        speed = 190
+        danger = 0
+        lat = 43.45
+        lon = 46.76
+        alerter._upload_to_firebase(alert, speed, current_time, danger, lat, lon)
+
+#test_upload_to_firebase()
 
 # def test():
 #     alert = Alerter()

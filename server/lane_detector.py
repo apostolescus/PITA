@@ -10,7 +10,6 @@ in same application real time it is used only basic lane detection.
 import time
 import cv2
 import numpy as np
-import tensorflow as tf
 import matplotlib.pyplot as plt
 
 from storage import get_polygone, RecordStorage
@@ -239,7 +238,7 @@ class LaneDetector:
                 # if the average time option is aviable
                 if self.last_time - time.time() < self.TIME_MAX and self.AVERAGE_TIME:
                     if self.avg_right is not None and self.avg_left is not None:
-                        return [self.avg_left, self.avg_right]
+                        return np.array([self.avg_left, self.avg_right])
                 return []
             else:
                 # update last detection time
@@ -249,7 +248,7 @@ class LaneDetector:
             # if the average time option is aviable
             if self.last_time - time.time() < self.TIME_MAX and self.AVERAGE_TIME:
                 if self.avg_right is not None and self.avg_left is not None:
-                    return [self.avg_left, self.avg_right]
+                    return np.array([self.avg_left, self.avg_right])
 
             return []
 

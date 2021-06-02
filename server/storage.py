@@ -161,9 +161,13 @@ def toggle_update_message():
 
 class StoppableThread(Thread):
     def __init__(self, name):
-        self.stopevent = Event()
+        #super(StoppableThread, self).__init__(*args, **kwargs)
         Thread.__init__(self, name=name)
+        self.stopevent = Event()
 
+    def stop(self):
+        self.stopevent.set()
+        
     def join(self):
         print("Thread" + self.name + " is stopping")
         self.stopevent.set()
