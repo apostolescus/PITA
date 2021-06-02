@@ -63,7 +63,7 @@ class VideoManagerSingleton:
         )
 
     def record(self, frame, long=False):
-
+        
         if self.buffer is None:
             self.buffer = [frame] * self.buffer_len
 

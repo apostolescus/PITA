@@ -118,6 +118,8 @@ class ImageObjectDetectorThread(StoppableThread):
         self.confidence = config_file["DETECTION"].getfloat("confidence")
         self.threshold = config_file["DETECTION"].getfloat("threshold")
         self.data_file = config_file["DETECTION"]["data_file"]
+        self.last_results = []
+        self.last_detection = 0.1
 
     def run(self):
 
@@ -139,13 +141,15 @@ class ImageObjectDetectorThread(StoppableThread):
             if timer:
                 start = time.time()
             
+            if time.time() - self.last_detection > 0.1:
             # perform object detection
-            detection_results = imageDetector.detect(image)
-            result = [detect_id, detection_results, image]
-           
-            if timer:
-                end = time.time()
-                logger.log("IMAGE_DETECTOR", "detection time is: " + str(end - start))
+                detection_results = imageDetector.detect(image)
+                self.last_result = [detect_id, detection_results, image]
+                self.last_detection = time.time()
+
+                if timer:
+                    end = time.time()
+                    logger.log("IMAGE_DETECTOR", "detection time is: " + str(end - start))
 
             # if lane_detection:
             #     print("-- image detector --- putting in Lane Detection Queue")
@@ -153,7 +157,7 @@ class ImageObjectDetectorThread(StoppableThread):
             # else:
             #     # print("-- image detector --- putting in Alerter Queue")
 
-            alerter_queue_image.put(result)
+            alerter_queue_image.put(self.last_result)
 
         threading.Thread.join(self)
 

@@ -1,7 +1,7 @@
 """ Part of the server module which analyse the context and determine if the driver is in danger."""
 
 import time
-
+from threading import Thread
 from firebase import firebase
 
 from storage import get_car_by_index
@@ -129,9 +129,8 @@ class Alerter:
                             detected_results.danger = 1
 
                             # uploading to firebase
-                            self._upload_to_firebase(
-                                "frontal_collision", speed, time.time(), 1, lat, lon
-                            )
+                            x = Thread(target=self._upload_to_firebase, args=("frontal_collision", speed, time.time(), 1, lat, lon,))
+                            x.start()
 
                             if "frontal_collision" in self.alerts:
                                 if time.time() - self.alerts["frontal_collision"] > 2:
@@ -161,16 +160,24 @@ class Alerter:
                             alert_time = self.alerts[detected_object.label]
 
                             if time.time() - alert_time > 4:
-
-                                # upload alert to firebase
-                                self._upload_to_firebase(
-                                    detected_object.label,
+                                x = Thread(target=self._upload_to_firebase,
+                                args=(detected_object.label,
                                     speed,
                                     time.time(),
                                     0,
                                     lat,
                                     lon,
-                                )
+                                ))
+                                x.start()
+                                # upload alert to firebase
+                                # self._upload_to_firebase(
+                                #     detected_object.label,
+                                #     speed,
+                                #     time.time(),
+                                #     0,
+                                #     lat,
+                                #     lon,
+                                # )
 
                                 # update alert timestamp
                                 self.alerts[detected_object.label] = time.time()

@@ -38,16 +38,15 @@ class LaneDetector:
         self.avg_right = None
         self.counter_left = 0
         self.counter_right = 0
-        self.last_time = time.time()
+        self.average_counter = 0
 
         # constant information from config file
         self.AVERAGE_LINES = config_file["LANE_DETECTION"].getboolean("lane_average")
-        self.AVERAGE_TIME = config_file["LANE_DETECTION"].getboolean("lane_inertia")
         self.AVERAGE_AVAILABLE = config_file["LANE_DETECTION"].getint(
             "average_available"
         )
         self.AVERAGE_MAX = config_file["LANE_DETECTION"].getint("average_max")
-        self.TIME_MAX = config_file["LANE_DETECTION"].getfloat("time_interval")
+        self.MAX_COUNTER = config_file["LANE_DETECTION"].getfloat("max_counter")
 
     def __canny(self, gray):
         """Applies gaussian blurs over the grayed image
@@ -151,10 +150,12 @@ class LaneDetector:
             left_fit_average = np.average(left_fit, axis=0)
             right_fit_average = np.average(right_fit, axis=0)
 
+            self.average_counter = 0
+
             left_line = self.__make_coordinates(image, left_fit_average, "left")
             right_line = self.__make_coordinates(image, right_fit_average, "right")
-
-            return np.array([left_line, right_line])
+            
+            return np.array([left_line, right_line]).astype(int)
 
         # only if left line detected
         # then use average right line
@@ -163,11 +164,13 @@ class LaneDetector:
             left_fit_average = np.average(left_fit, axis=0)
             left_line = self.__make_coordinates(image, left_fit_average, "left")
 
+            self.average_counter = 0
+
             # using average right line
             if self.counter_right > self.AVERAGE_AVAILABLE and self.AVERAGE_LINES:
-                return np.array([left_line, self.avg_right])
+                return np.array([left_line, self.avg_right]).astype(int)
             else:
-                return np.array([left_line])
+                return np.array([left_line]).astype(int)
 
         # only right line detected
         # then use average left line
@@ -176,13 +179,21 @@ class LaneDetector:
             right_fit_average = np.average(right_fit, axis=0)
             right_line = self.__make_coordinates(image, right_fit_average, "right")
 
+            self.average_counter = 0
+
             # using average right line if the average was calculated on more than
             # average_avilable times and it is True in config file
             if self.counter_left > self.AVERAGE_AVAILABLE and self.AVERAGE_LINES:
-                return np.array([self.avg_left, right_line])
+                return np.array([self.avg_left, right_line]).astype(int)
             else:
-                return np.array([right_line])
+                return np.array([right_line]).astype(int)
         else:
+            if self.average_counter < self.MAX_COUNTER:
+                self.average_counter += 1
+                #print("NO line detected after slope, average counter: ", self.average_counter)
+                if self.avg_right is not None and self.avg_left is not None:
+                        return np.array([self.avg_left, self.avg_right]).astype(int)
+
             return []
 
     def __display_lines(self, image, lines):
@@ -232,24 +243,14 @@ class LaneDetector:
             if timer:
                 print("After average: ", time.time() - start_time)
 
-            # if the slope of the lines was out of rane
-            # no lane is detected
-            if len(averaged_lines) == 0:
-                # if the average time option is aviable
-                if self.last_time - time.time() < self.TIME_MAX and self.AVERAGE_TIME:
-                    if self.avg_right is not None and self.avg_left is not None:
-                        return np.array([self.avg_left, self.avg_right])
-                return []
-            else:
-                # update last detection time
-                self.last_time = time.time()
-                return averaged_lines
+            return averaged_lines
         else:
             # if the average time option is aviable
-            if self.last_time - time.time() < self.TIME_MAX and self.AVERAGE_TIME:
+            if self.average_counter < self.MAX_COUNTER:
+                #print("NO line detected, average counter: ", self.average_counter)
+                self.average_counter += 1
                 if self.avg_right is not None and self.avg_left is not None:
-                    return np.array([self.avg_left, self.avg_right])
-
+                    return np.array([self.avg_left, self.avg_right]).astype(int)
             return []
 
 

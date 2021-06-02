@@ -30,7 +30,10 @@ Python Intelligent Traffic Assistant
 - [x] add CONFIG file
 - [x] clean code
 - [x] add average capture-process-return time measurements
-- [ ] send polygone with first message
+- ~~[ ] send polygone with first message
+- [ ] add custom sound for each alert
+- [x] display last alert in GUI
+- [x] display speed in GUI
 
 ### **Coral TPU:**
  - [x] test tflite model
@@ -69,6 +72,7 @@ Python Intelligent Traffic Assistant
 - [x] alert only for vehicles on the same 
 lane
 - [x] add connection to Firebase
+- [x] upload data in other thread
 - [x] make noise when in danger
 - [x] send data to firebase when danger
 - [x] save in redundancy database
@@ -88,12 +92,14 @@ lane
 ### **Testing: **
 - [x] measure time using uuids
 - [x] test lane detection
+- [ ] test alert sound
+- [x] test object detector GPU/CPU + tiny/normal
 - [ ] test alert system (firebase, custom notifications)
 
 **Optional**:
-- [ ] improve lane detection
-- [ ] split gpu detection multithread
-- [ ] split lane/object detection multithread
+- [x] improve lane detection
+- [x] split gpu detection multithread
+- [x] split lane/object detection multithread
 - [ ] add advanced lane detection
 - [ ] add mode for user to modify fix size time
 
