@@ -47,6 +47,7 @@ alerter_priority = {
     "curve-left": 93,
     "curve-right": 93,
 }
+
 def set_poly_lines(poly, nump):
     global poly_lines, np_lines
     poly_lines = poly
@@ -54,8 +55,10 @@ def set_poly_lines(poly, nump):
 
 def get_poly_lines(name):
     if name == "poly":
+        print("Returning Poly lines")
         return poly_lines
     else:
+        print("Returning np lines")
         return np_lines
 class DetectedPipeline:
     def __init__(self, image):
@@ -68,6 +71,7 @@ class DetectedPipeline:
         self.frontal_objects = None
         self.frontal_distances = None
         self.line_array = None
+        self.safe_distance = 0
 
     def get_serializable(self):
         return None

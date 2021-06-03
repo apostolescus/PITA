@@ -90,6 +90,7 @@ class ImageDetector:
 
         self.labels = open(labels).read().strip().split("\n")
 
+        self._poly_lines = Polygon(get_poly_lines("poly"))
         # start_time = time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime(time.time()))
         # log_file_name = "{:s}_{:s}.log".format("LOG_FILE", start_time)
         # log_file_path = os.path.join(os.getcwd(), log_file_name)
@@ -127,8 +128,8 @@ class ImageDetector:
         frontal_objects = {}
 
         # polygon used for lane detection and collision system
-        p1 = Polygon(get_poly_lines("poly"))
-     
+        p1 = self._poly_lines
+        
         if detected_list:
             for detected_object in detected_list:
                 x, y = detected_object.bbx[0], detected_object.bbx[1]
@@ -136,27 +137,27 @@ class ImageDetector:
 
                 # calculate overlap area
                 object_area = w * h
-                object_area_min_val = 80 / 100 * object_area
+                object_area_min_val = 75 / 100 * object_area
                 y_cart = height - y - h
+                poli_list = [(x, y_cart), (x + w, y_cart), (x + w, y_cart + h), (x, y_cart + h)]
+                
+                p2 = Polygon(poli_list)
+                
 
-                p2 = Polygon(
-                    [(x, y_cart), (x + w, y_cart), (x + w, y_cart + h), (x, y_cart + h)]
-                )
-
-                # if the car is in front and it is over 80% inside the riding view
+                # if the car is in front and it is over 75% inside the riding view
                 # calculate distance and add as possible danger
 
                 intersection = p2.intersects(p1)
 
                 if intersection:
                     intersection_area = p2.intersection(p1).area
-
                     if intersection_area >= object_area_min_val:
                         distance = self._get_distance(detected_object.id, w, h)
                         distance_vector[distance] = detected_object.id
 
                         id = detected_object.id
                         frontal_objects[id] = 0
+
 
         return distance_vector, frontal_objects
 

@@ -65,10 +65,17 @@ class Alerter:
     def update(self, update):
         """Method that updates values of the parameters used to calculate
         the maximum braking distance."""
+        
+        if update.experience == 0:
+            add_reaction_time = 1
+        elif update.experience == 1:
+            add_reaction_time = 0.5
+        else:
+            add_reaction_time = 0.3
 
         car_type = get_car_by_index(update.car_type)
         weather_type = get_weather_by_index(update.weather)
-        reaction = update.reaction_time + update.experience
+        reaction = update.reaction_time + add_reaction_time
 
         # get friction coefficient
         friction_coef = "FrictionCoefficient." + car_type + "." + weather_type
@@ -119,6 +126,7 @@ class Alerter:
                     sorted_distances = sorted(dictionary)
 
                     max_distance = self._calculate_max_distance(speed)
+                    detected_results.safe_distance = max_distance
 
                     for object_distance in sorted_distances:
                         if max_distance > object_distance[0]:

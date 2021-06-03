@@ -1,5 +1,6 @@
 [VIDEO]
 mode = video
+#path = ../video/good.mp4
 path = ../video/city_drive_through.mp4
 width = 640
 height = 480
@@ -45,8 +46,15 @@ time = False
 video_frames = 0 
 
 [FRAME]
-display = False
-h1 = -530,-50
-h2 = -15,200
-h3 = -120,-50
+display = True
+# city
+h1 = -530,0
+h2 = -5,250
+h3 = -120,0
+
+# highway
+#h1 = -530,-50
+#h2 = -15,200
+#h3 = -120,-50
+
 

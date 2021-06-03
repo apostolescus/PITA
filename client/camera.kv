@@ -146,10 +146,11 @@
                 Switch:
                     id: switch
                     on_active: app.switch_callback()
+           
             BoxLayout:
                 orientation: 'vertical'
                 spacing:10
-                spacing:10
+       
                 Label:
                     text:'Last Alert'
                     font_size: 20
@@ -203,6 +204,21 @@
                     color: [252, 3, 3, 1]
                     text: 'person'
 
+            BoxLayout:
+                orientation: 'vertical'
+                spacing:10
+                spacing:10
+                Label:
+                    text:'Safe Distance'
+                    font_size: 20
+                    font_name: font_bold
+                Label:
+                    id: safe_dist
+                    font_size: 17
+                    font_name: font_bold
+                    color: [252, 3, 3, 1]
+                    text: '23'
+
 
 
 <Screen_Two>:
@@ -253,7 +269,7 @@
             	
                 id: whatever
                 text: "Uscat"                   #default value showed
-                values: ["Umed","Zapada","Gheata"]       #list of values to show
+                values: ["Uscat", "Umed","Zapada","Gheata"]       #list of values to show
                 on_text:
                     root.on_spinner_select_weather_type(self.text)
                 size_hint : (0.7, 1)

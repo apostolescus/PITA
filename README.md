@@ -19,7 +19,7 @@ Python Intelligent Traffic Assistant
 - [x] allow both CPU/GPU detection
 - [x] added config file
 - [x] clean code
-- [ ] add traffic light/sempahores warning
+- [x] add traffic light/sempahores warning
 
 ### **Client:**
 - [x] establish localhost connection
@@ -30,10 +30,10 @@ Python Intelligent Traffic Assistant
 - [x] add CONFIG file
 - [x] clean code
 - [x] add average capture-process-return time measurements
-- ~~[ ] send polygone with first message
-- [ ] add custom sound for each alert
+- [x] send polygone with first message
 - [x] display last alert in GUI
 - [x] display speed in GUI
+- [ ] add custom sound for each alert
 
 ### **Coral TPU:**
  - [x] test tflite model
@@ -87,21 +87,23 @@ lane
 - [x] add alerts for other type of incidents
 - [x] show notification on GUI
 - [x] remove GUI button for update
-- [ ] add personalized sound for each alert
+- [x] add extra infos to GUI
+- [ ] formatting and clean code
 
 ### **Testing: **
 - [x] measure time using uuids
 - [x] test lane detection
-- [ ] test alert sound
+- [x] test alert sound
 - [x] test object detector GPU/CPU + tiny/normal
-- [ ] test alert system (firebase, custom notifications)
+- [x] test alert system (firebase, custom notifications)
+- [x] test update system 
+- [ ] test video recording modes
 
 **Optional**:
 - [x] improve lane detection
 - [x] split gpu detection multithread
 - [x] split lane/object detection multithread
 - [ ] add advanced lane detection
-- [ ] add mode for user to modify fix size time
 
 ### **Docs:**
 - [x] recording modes documentation

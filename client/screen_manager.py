@@ -18,7 +18,7 @@ from kivy.config import Config
 # import local dependencies
 from camera_manager import CameraManagerSingleton
 from storage import UISelected, StoppableThread
-from storage import toggle_update_message, last_alert_queue
+from storage import toggle_update_message, last_alert_queue, safe_distance_queue
 from storage import toggle_switch_sound, config_file, distance_queue
 from storage import alerter_dictionary, alerter_color, speed_screen_queue
 
@@ -59,6 +59,17 @@ class Screen_One(Screen):
         #schedule distance checker
         Clock.schedule_interval(self._update_distances, 1/2)
 
+        # safe distance updater
+        Clock.schedule_interval(self._update_safe_distance, 1)
+    
+    def _update_safe_distance(self, dt):
+
+        try:
+            safe_dist = safe_distance_queue.get_nowait()
+            self.ids.safe_dist.text = str(safe_dist) + " m"
+
+        except Empty:
+            pass
     def _update_distances(self, dt):
 
         try:

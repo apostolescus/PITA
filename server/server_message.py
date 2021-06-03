@@ -254,15 +254,14 @@ class Message:
 
         if self._first_detection:
             
-            
             np_lines = self.json_header["np-lines"]
             poly_lines = self.json_header["poly-lines"]
 
             set_poly_lines(poly_lines, np_lines)
             self._first_detection = False
 
-            image_thread = ImageObjectDetectorThread("image_detector").start()
-            alerter_thread = AlertThread("alerter").start()
+            ImageObjectDetectorThread("image_detector").start()
+            AlertThread("alerter").start()
 
         if request_type == "DETECT":
             content_len = self.json_header["content-len"]
@@ -335,6 +334,9 @@ class Message:
                     dictionary["alert"] = alert
                 else:
                     dictionary["alert"] = ''
+
+                if detected_obj.safe_distance != 0:
+                    dictionary["safe_distance"] = round(detected_obj.safe_distance,2)
             else:
                 dictionary["detected_objects"] = None
                 dictionary["danger"] = None
@@ -342,6 +344,8 @@ class Message:
             dictionary["detected_objects"] = None
             dictionary["danger"] = None
 
+            
+        
         self._results = dictionary
 
     def read(self):

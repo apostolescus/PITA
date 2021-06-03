@@ -20,7 +20,7 @@ from screen_manager import captured_image_queue, result_queue
 from storage import toggle_update_message, get_update_message, config_file
 from storage import UISelected, get_switch_sound, gps_queue, logger
 from storage import last_alert_queue, alerter_priority, distance_queue
-from storage import load_polygone_lines
+from storage import load_polygone_lines, safe_distance_queue
 
 # globals
 lane_detection = False
@@ -347,7 +347,8 @@ class Message:
         obj_list = response["detected_objects"]
         danger = response["danger"]
         line = response["lines"]
-
+        
+        
         try:
             alert = response["alert"]
             
@@ -360,7 +361,16 @@ class Message:
                 
         except KeyError:
             pass
-
+        
+        try:
+            safe_distance = response["safe_distance"]
+            
+            try:
+                safe_distance_queue.put_nowait(safe_distance)
+            except Full:
+                pass
+        except KeyError:
+            pass
 
         switch_sound = get_switch_sound()
         if danger == 1 and switch_sound:
@@ -412,15 +422,15 @@ class Message:
             # print("Lines: ", type(line))
             # self._current_image = cv2.addWeighted(self._current_image, 1, line, 0.5, 1)
 
-        # only for experimental/ debugging purpose
-        if counter > 0:
-            self.out.write(self._current_image)
-            counter -= 1
-        else:
-            if self.saved is False:
-                print("VIDEO SAVED SUCCESFULLY")
-                self.out.release()
-                self.saved = True
+        # # only for experimental/ debugging purpose
+        # if counter > 0:
+        #     self.out.write(self._current_image)
+        #     counter -= 1
+        # else:
+        #     if self.saved is False:
+        #         print("VIDEO SAVED SUCCESFULLY")
+        #         self.out.release()
+        #         self.saved = True
 
         # display triangle used for lane and collision
         if self._DISPLAY_TRIANGLE:

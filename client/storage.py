@@ -12,6 +12,7 @@ gps_queue = Queue()
 speed_screen_queue = Queue(2)
 last_alert_queue = Queue(1)
 distance_queue = Queue(2)
+safe_distance_queue = Queue(1)
 
 switch_sound = False
 update_message = False
@@ -117,11 +118,12 @@ def load_polygone_lines():
     np_val.append(l3)
 
     l1_poly = (width + int(l11), -int(l12))
+    l2_poly = (int(width/2) + int(l21), height - int(l22))
     l3_poly = (width + int(l31), -int(l32))
 
     poly_val = []
     poly_val.append(l1_poly)
-    poly_val.append(l2)
+    poly_val.append(l2_poly)
     poly_val.append(l3_poly)
 
     return np_val, poly_val
