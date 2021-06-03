@@ -19,7 +19,8 @@ from playsound import playsound
 from screen_manager import captured_image_queue, result_queue
 from storage import toggle_update_message, get_update_message, config_file
 from storage import UISelected, get_switch_sound, gps_queue, logger
-from storage import last_alert_queue, alerter_priority
+from storage import last_alert_queue, alerter_priority, distance_queue
+from storage import load_polygone_lines
 
 # globals
 lane_detection = False
@@ -66,7 +67,17 @@ class Message:
         self._last_lat: float = 0
         self._last_lon: float = 0
         self._last_speed: int = 0
+        
+        # only for the first time send polygone
+        self._start = True
+        self._polygone_lines = []
+        self._np_lines = []
+        self._DISPLAY_TRIANGLE:bool = config_file["FRAME"].getboolean("display")
 
+        # alert display only list
+        self._alert_list = config_file["ALERT"]["show_alerts"].split(",")
+        for i in self._alert_list:
+            print(i)
         # only for lane detection comparision
         if counter != 0:
             self.out = cv2.VideoWriter(
@@ -158,6 +169,13 @@ class Message:
                     "uuid":str(unique_id),
                 }
 
+            # if first message send polygone lines
+            if self._start:
+                self._np_lines, poly_line = load_polygone_lines()
+                header["np-lines"] = self._np_lines
+                header["poly-lines"] = poly_line
+                self._start = False
+
             # update lane detection
             lane_detection = UISelected.lane_detection
 
@@ -182,7 +200,8 @@ class Message:
                 self._last_lon = gps_infos[2]
             except Empty:
                 pass
-         
+           
+                
             # create header dictionary
             header = {
                 "request-type": "DETECT",
@@ -330,52 +349,24 @@ class Message:
         line = response["lines"]
 
         try:
-            alerts = response["alerts"]
-            # display alerts
+            alert = response["alert"]
             
-            if alerts:
-                max_priority = 0
-                max_alert = 0
-
-                # get the most important alert
-                for alert in alerts:
-                    try:
-                        priority = alerter_priority[alert] 
-                        if priority > max_priority:
-                            max_alert = alert
-                    except KeyError:
-                        priority = 1
-                        if priority > max_priority:
-                            max_alert = alert
-                            
-                # put in queue the most important alert
+            if alert and alert in self._alert_list:
+                print("Alert response: ", alert)
                 try:
-                    last_alert_queue.put(max_alert)
+                    last_alert_queue.put(alert)
                 except Full:
                     pass
-
+                
         except KeyError:
             pass
+
 
         switch_sound = get_switch_sound()
         if danger == 1 and switch_sound:
             
             t = Thread(target=play_sound)
             t.start()
-
-        height = self._current_image.shape[0]
-        width = self._current_image.shape[1]
-
-        pts = np.array(
-            [
-                [
-                    (width - 530, height - 50),
-                    (width / 2 - 15, 200),
-                    (width - 120, height - 50),
-                ]
-            ],
-            np.int32,
-        )
 
         image = self._current_image
 
@@ -389,6 +380,15 @@ class Message:
                 label = obj["label"]
                 score = obj["score"]
                 text = "{}: {:.4f}".format(label, score)
+
+                try:
+                    distance = obj["distance"]
+                    try:
+                        distance_queue.put_nowait((label, distance))
+                    except Full:
+                        pass
+                except KeyError:
+                    pass
 
                 cv2.rectangle(image, (x, y), (x + w, y + h), color, 2)
                 cv2.putText(
@@ -423,7 +423,9 @@ class Message:
                 self.saved = True
 
         # display triangle used for lane and collision
-        # cv2.polylines(self._current_image, pts, True, (0, 255, 255), 2)
+        if self._DISPLAY_TRIANGLE:
+            pts = np.array([self._np_lines], np.int32)
+            cv2.polylines(self._current_image, pts, True, (0, 255, 255), 2)
 
     def _read(self):
 

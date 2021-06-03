@@ -5,11 +5,11 @@ from threading import Thread
 from firebase import firebase
 
 from storage import get_car_by_index
-from storage import get_weather_by_index
+from storage import get_weather_by_index, alerter_priority
 from storage import FrictionCoefficient, Constants, RecordStorage, logger
 from video_manager_wrapper import VideoManagerWrapper
 
-non_alert_list = ["car", "bus", "camion", "moto"]
+non_alert_list = ["car", "bus", "truck", "moto"]
 
 
 class Update:
@@ -37,7 +37,6 @@ class Alerter:
 
     def __init__(
         self,
-        danger_area,
         car_type="standard_stock",
         weather_type="dry_asphalt",
         reaction_time=1,
@@ -49,16 +48,19 @@ class Alerter:
         self.multiply = FrictionCoefficient.formula.multiplier / friction_coef
         self.reaction_time = reaction_time * Constants.km_to_h
         self.recording_mode = 0
-        self.alerts = {}
+        self.alert = {}
         self.record_delay = 0
         self.recording = False
         self.started = False
         self.update_obj = None
-        self.danger_area = danger_area
         self.last_detected = None
         self.firebase_app = firebase.FirebaseApplication(
             "https://pita-13817-default-rtdb.europe-west1.firebasedatabase.app/", None
         )
+
+        self.alert["alert"] = "none"
+        self.alert["priority"] = 0
+        self.alert["time"] = time.time()
 
     def update(self, update):
         """Method that updates values of the parameters used to calculate
@@ -108,7 +110,7 @@ class Alerter:
             if detected:
                 distances = detected_results.frontal_distances
 
-                detected_results.alerts.clear()
+                detected_results.alert = ''
 
                 # if there is any detected object that was in the ROI
                 if len(distances) >= 1:
@@ -129,15 +131,17 @@ class Alerter:
                             detected_results.danger = 1
 
                             # uploading to firebase
-                            x = Thread(target=self._upload_to_firebase, args=("frontal_collision", speed, time.time(), 1, lat, lon,))
-                            x.start()
+                            # x = Thread(target=self._upload_to_firebase, args=("frontal_collision", speed, time.time(), 1, lat, lon,))
+                            # x.start()
 
-                            if "frontal_collision" in self.alerts:
-                                if time.time() - self.alerts["frontal_collision"] > 2:
-                                    self.alerts['frontal_collision'] = time.time()
-                                    detected_results.alerts.append('frontal_collision')
-                            else:
-                                self.alerts['frontal_collision'] = time.time()
+                            if "frontal_collision" != self.alert["alert"]:
+                                    self.alert["alert"] = "frontal_collision"
+                                    self.alert["time"] = time.time()
+                                    self.alert["priority"] = 99 
+                                    detected_results.alert = 'frontal_collision'
+
+                            elif time.time() - self.alert["time"] > 1:
+                                self.alert["time"] = time.time()
 
                             if not RecordStorage.start_smart:
                                 logger.log("ALERTER","Smart Record Started")
@@ -154,13 +158,46 @@ class Alerter:
 
                 for detected_object in detected_results.detected_objects:
                     if detected_object.label not in non_alert_list:
+                        
+                        # get alert priority
 
-                        # check if object in alert
-                        if detected_object.label in self.alerts:
-                            alert_time = self.alerts[detected_object.label]
+                        try:
+                            priority = alerter_priority[detected_object.label]
+                        except KeyError:
+                            priority = 1
 
-                            if time.time() - alert_time > 4:
-                                x = Thread(target=self._upload_to_firebase,
+                        # if it's of bigger priority than the current alert
+                        if priority > self.alert["priority"]:
+                            self.alert["alert"] = detected_object.label
+                            self.alert["time"] = time.time()
+                            self.alert["priority"] = priority
+
+                            # upload to firebase
+                            # x = Thread(target=self._upload_to_firebase,
+                            #     args=(detected_object.label,
+                            #         speed,
+                            #         time.time(),
+                            #         0,
+                            #         lat,
+                            #         lon,
+                            #     ))
+                            # x.start()
+
+                            # add alert to the client response
+                            detected_results.alert = self.alert["alert"]
+                        
+                        # if it's the same alert update time
+                        elif priority == self.alert["priority"]:
+                            self.alert["time"] = time.time()
+
+                        # if it's lower priority check if the time has expired
+                        elif time.time() - self.alert["time"] > 1:
+                            self.alert["alert"] = detected_object.label
+                            self.alert["time"] = time.time()
+                            self.alert["priority"] = priority
+
+                            # upload to firebase
+                            x = Thread(target=self._upload_to_firebase,
                                 args=(detected_object.label,
                                     speed,
                                     time.time(),
@@ -168,23 +205,11 @@ class Alerter:
                                     lat,
                                     lon,
                                 ))
-                                x.start()
-                                # upload alert to firebase
-                                # self._upload_to_firebase(
-                                #     detected_object.label,
-                                #     speed,
-                                #     time.time(),
-                                #     0,
-                                #     lat,
-                                #     lon,
-                                # )
+                            x.start()
 
-                                # update alert timestamp
-                                self.alerts[detected_object.label] = time.time()
-                                detected_results.alerts.append(detected_object.label)
+                            # add alert to the client response
+                            detected_results.alert = self.alert["alert"]
 
-                        else:
-                            self.alerts[detected_object.label] = time.time()
 
         # check if it is still recording for more than 2 seconds
         if RecordStorage.start_smart and (time.time() - self.record_delay > 2):

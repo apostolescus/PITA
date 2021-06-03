@@ -21,7 +21,7 @@ file = log.file
 
 [SERVER]
 ip = 10.13.0.200
-port = 65432
+port = 65431
 
 [CERTIFICATES]
 client_cert = client_certificates/client.crt
@@ -32,6 +32,9 @@ hostname = pita
 [GPS]
 update_interval = 2
 
+[ALERT]
+show_alerts = frontal_collision,priority,keep-right,stop,curve-right,parking,curve-left,no-entry,pedestrians,give-way,bike,bus,car,person,motorbike,green,red,red-left,truck
+
 [DETECTION]
 points = [asda]
 
@@ -40,3 +43,10 @@ verbose = False
 time = False
 # save x video frames
 video_frames = 0 
+
+[FRAME]
+display = False
+h1 = -530,-50
+h2 = -15,200
+h3 = -120,-50
+

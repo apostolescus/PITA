@@ -11,12 +11,16 @@ gps_lock = Lock()
 gps_queue = Queue()
 speed_screen_queue = Queue(2)
 last_alert_queue = Queue(1)
+distance_queue = Queue(2)
 
 switch_sound = False
 update_message = False
 
 config_file = configparser.ConfigParser()
 config_file.read("config.file")
+
+width = config_file["VIDEO"].getint("width")
+height = config_file["VIDEO"].getint("height")
 
 # alerter dictionary
 alerter_dictionary = {
@@ -74,6 +78,53 @@ alerter_priority = {
     "curve-left": 93,
     "curve-right": 93,
 }
+
+def load_polygone_lines():
+    '''Loads points that build the detection triangle from
+    configuration files.
+
+    Returns two lists, one for lane detection(np) 
+    and other for intersection calculation(poly).'''
+
+    # if type == "poly":
+    #     return  [
+    #                 (width - 530, height - (height - 50)),
+    #                 (width / 2 - 15, height - 200),
+    #                 (width - 120, height - (height - 50)),
+    #             ]
+    # elif type == "np":
+    #     return[
+    #         (width - 530, height-50),
+    #         (int(width/2) - 15, 200),
+    #         (width - 120, height-50)
+    #     ]
+
+    l1 = config_file["FRAME"]["h1"]
+    l2 = config_file["FRAME"]["h2"]
+    l3 = config_file["FRAME"]["h3"]
+
+    l11,l12 = l1.split(",")
+    l21, l22 = l2.split(",")
+    l31, l32 = l3.split(",")
+
+    l1 = (width + int(l11), height + int(l12))
+    l2 = (int(width/2) + int(l21), int(l22))
+    l3 = (width + int(l31), height + int(l32))
+
+    np_val = []
+    np_val.append(l1)
+    np_val.append(l2)
+    np_val.append(l3)
+
+    l1_poly = (width + int(l11), -int(l12))
+    l3_poly = (width + int(l31), -int(l32))
+
+    poly_val = []
+    poly_val.append(l1_poly)
+    poly_val.append(l2)
+    poly_val.append(l3_poly)
+
+    return np_val, poly_val
 
 # store last gps data
 old_gps_value: list = [0, 0, 0]

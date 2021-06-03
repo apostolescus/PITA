@@ -12,16 +12,25 @@ time_rate = 0.01
 
 class GPS(StoppableThread):
     def __init__(self, name):
-        self.speed: int = 190
+        self.speed: int = 50
         self.lock = Lock()
         StoppableThread.__init__(self, name=name)
 
     def increase_speed(self) -> None:
-        self.speed = self.speed + 5
+        self.speed = self.speed + 1
 
     def decrease_speed(self) -> None:
-        self.speed = self.speed - 5
+        self.speed = self.speed - 1
 
+    def update_speed(self):
+        number = random.randint(-5,4)
+        
+        self.speed += number
+
+        while self.speed <= 0:
+            number = random.randint(0,3)
+            self.speed += number
+            
     def run(self) -> None:
 
         while not self.stopevent.isSet():
@@ -39,6 +48,7 @@ class GPS(StoppableThread):
             except Full:
                 pass
             
+            self.update_speed()
             time.sleep(0.5)
             # time.sleep(time_rate)
 

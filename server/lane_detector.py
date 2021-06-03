@@ -12,7 +12,7 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 
-from storage import get_polygone, RecordStorage
+from storage import  RecordStorage, get_poly_lines
 from storage import config_file, timer, logger
 
 # for testing only
@@ -66,7 +66,7 @@ class LaneDetector:
         """Selects and crops a region of interest
         for searching lines."""
 
-        polygons = get_polygone("np")
+        polygons = get_poly_lines("other")
         polygons = np.array([polygons])
 
         mask = np.zeros_like(image)

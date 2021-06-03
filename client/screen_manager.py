@@ -19,7 +19,7 @@ from kivy.config import Config
 from camera_manager import CameraManagerSingleton
 from storage import UISelected, StoppableThread
 from storage import toggle_update_message, last_alert_queue
-from storage import toggle_switch_sound, config_file
+from storage import toggle_switch_sound, config_file, distance_queue
 from storage import alerter_dictionary, alerter_color, speed_screen_queue
 
 # Queues for pipeline
@@ -56,9 +56,21 @@ class Screen_One(Screen):
         # schedule alert checking
         Clock.schedule_interval(self._update_alerts, 1/10)
 
+        #schedule distance checker
+        Clock.schedule_interval(self._update_distances, 1/2)
+
+    def _update_distances(self, dt):
+
+        try:
+            label, distance = distance_queue.get_nowait()
+            self.ids.distance.text = str(distance)
+            self.ids.obj_label.text = str(label)
+        except Empty:
+            pass
+
     def _update_alerts(self, dt):
         '''Updates to screen last alert'''
-        
+
         try:
             last_alert = last_alert_queue.get_nowait()
 

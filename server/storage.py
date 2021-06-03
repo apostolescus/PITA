@@ -5,19 +5,24 @@ import configparser
 import loguru
 
 config_file = configparser.ConfigParser()
-config_file.read("server.config")
+config_file.read("config.file")
 
 lock = Lock()
 close = False
 switch_sound = False
 update_message = False
 
+# declaration of points used for
+# lane and collision detection
+np_lines = []
+poly_lines = []
+
 # used to display times for all the processes
 timer = config_file["DEBUG"].getboolean("time")
 debug_mode = config_file["DEBUG"].getboolean("verbose")
 
-width = 640
-height = 480
+width = config_file["VIDEO"].getint("width")
+height = config_file["VIDEO"].getint("height")
 
 # initialize logger
 logger = loguru.logger
@@ -31,28 +36,35 @@ logger.level("VIDEO", no=15,color="<green>")
 logger.level("SERVER", no=16, color="<cyan>")
 logger.level("LANE_DETECTOR", no=16, color="<yellow>")
 
-def get_polygone(type):
-    if type == "poly":
-        return  [
-                    (width - 530, height - (height - 50)),
-                    (width / 2 - 15, height - 200),
-                    (width - 120, height - (height - 50)),
-                ]
-    elif type == "np":
-        return[
-            (width - 530, height-50),
-            (int(width/2) - 15, 200),
-            (width - 120, height-50)
-        ]
-            
+alerter_priority = {
+    "frontal_collision": 100,
+    "stop": 98,
+    "red": 99,
+    "no-entry": 97,
+    "give-way": 96,
+    "person": 95,
+    "keep-right": 94,
+    "curve-left": 93,
+    "curve-right": 93,
+}
+def set_poly_lines(poly, nump):
+    global poly_lines, np_lines
+    poly_lines = poly
+    np_lines = nump
+
+def get_poly_lines(name):
+    if name == "poly":
+        return poly_lines
+    else:
+        return np_lines
 class DetectedPipeline:
     def __init__(self, image):
 
         self.image = image
-        self.detected = False
+        self.detected:bool = False
         self.detected_objects = None
-        self.danger = 0
-        self.alerts = []
+        self.danger:int = 0
+        self.alert:str = ''
         self.frontal_objects = None
         self.frontal_distances = None
         self.line_array = None
@@ -88,6 +100,7 @@ class FrictionCoefficient:
 
     class formula:
         multiplier = 0.003914
+
 
 
 def get_car_by_index(index):

@@ -15,6 +15,7 @@ from alerter import Alerter, Update
 from lane_detector import LaneDetector
 from storage import StoppableThread
 from storage import logger, config_file, timer, debug_mode
+from storage import np_lines, poly_lines, set_poly_lines
 
 lane_detection = False
 
@@ -33,11 +34,9 @@ average_time_counter = 0
 
 class AlertThread(StoppableThread):
     """Wrapper for Alert Class to Stoppable Thread."""
-
     def __init__(self, name):
         super(AlertThread, self).__init__(name)
-        height = 1080
-        self.alerter = Alerter([(340, height - 150), (920, 550), (1570, height - 150)])
+        self.alerter = Alerter()
 
     def update(self, update):
         self.alerter.update(update)
@@ -162,8 +161,7 @@ class ImageObjectDetectorThread(StoppableThread):
         threading.Thread.join(self)
 
 
-image_thread = ImageObjectDetectorThread("image_detector").start()
-alerter_thread = AlertThread("alerter").start()
+
 
 
 class Message:
@@ -185,6 +183,10 @@ class Message:
         self._results = None
         self._waiting_images = Queue(3)
         self._detection_results = Queue(1)
+
+        # get first message 
+        # and poligone
+        self._first_detection = True
 
     def process_message(self, mask):
         if mask & selectors.EVENT_READ:
@@ -250,6 +252,18 @@ class Message:
 
         request_type = self.json_header["request-type"]
 
+        if self._first_detection:
+            
+            
+            np_lines = self.json_header["np-lines"]
+            poly_lines = self.json_header["poly-lines"]
+
+            set_poly_lines(poly_lines, np_lines)
+            self._first_detection = False
+
+            image_thread = ImageObjectDetectorThread("image_detector").start()
+            alerter_thread = AlertThread("alerter").start()
+
         if request_type == "DETECT":
             content_len = self.json_header["content-len"]
 
@@ -281,13 +295,17 @@ class Message:
                 dictionary["lines"] = None
         else:
             dictionary["lines"] = None
-
+        
         if detected_obj:
             if detected_obj.detected:
 
                 formatted_list = []
                 detected_list = detected_obj.detected_objects
-                alerts = detected_obj.alerts
+                
+                frontal_object = detected_obj.frontal_objects
+                distance_vector = {v: k for k, v in detected_obj.frontal_distances.items()} 
+
+                alert = detected_obj.alert
 
                 for obj in detected_list:
 
@@ -298,6 +316,12 @@ class Message:
                     label = obj.label
                     score = obj.score
 
+                    obj_id = obj.id
+                   
+                    if obj_id in frontal_object:
+                        distance = distance_vector[obj_id]
+                        obj_dictionary["distance"] = round(distance,2)
+
                     obj_dictionary["color"] = color
                     obj_dictionary["label"] = label
                     obj_dictionary["score"] = score
@@ -307,10 +331,10 @@ class Message:
                 dictionary["detected_objects"] = formatted_list
                 dictionary["danger"] = detected_obj.danger
 
-                if alerts:
-                    dictionary["alerts"] = alerts
+                if alert:
+                    dictionary["alert"] = alert
                 else:
-                    dictionary["alerts"] = None
+                    dictionary["alert"] = ''
             else:
                 dictionary["detected_objects"] = None
                 dictionary["danger"] = None
