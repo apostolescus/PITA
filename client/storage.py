@@ -6,7 +6,10 @@ import loguru
 
 lock = Lock()
 gps_lock = Lock()
+
+# initialise queues
 gps_queue = Queue()
+speed_screen_queue = Queue(2)
 last_alert_queue = Queue(1)
 
 switch_sound = False
@@ -39,28 +42,38 @@ alerter_dictionary = {
 }
 
 alerter_color = {
-    "frontal_collision": 2,
-    "priority": 0,
-    "keep-right": 1,
-    "stop": 2,
-    "curve-right": 1,
-    "parking": 0,
-    "curve-left": 1,
-    "no-entry": 2,
-    "pedestrians": 1,
-    "give-way": 2,
-    "bike": 0,
-    "bus": 0,
-    "car":0,
-    "person":0,
-    "motorbike": 0,
-    "green": 0,
-    "red": 2,
-    "red-left": 2,
-    "truck": 0,
+    "frontal_collision": [33, 210, 202, 1],
+    "priority": [252, 3, 3, 1],
+    "keep-right": [3, 3, 255, 1],
+    "stop": [33, 210, 202, 1],
+    "curve-right": [3, 3, 255, 1],
+    "parking": [252, 3, 3, 1],
+    "curve-left": [3, 3, 255, 1],
+    "no-entry": [33, 210, 202, 1],
+    "pedestrians": [3, 3, 255, 1],
+    "give-way": [33, 210, 202, 1],
+    "bike": [252, 3, 3, 1],
+    "bus": [252, 3, 3, 1],
+    "car": [252, 3, 3, 1],
+    "person": [252, 3, 3, 1],
+    "motorbike": [252, 3, 3, 1],
+    "green": [252, 3, 3, 1],
+    "red": [33, 210, 202, 1],
+    "red-left": [33, 210, 202, 1],
+    "truck": [252, 3, 3, 1],
 }
 
-alerter_priority = {"frontal_collision": 100, "stop": 98, "red": 99, "no-entry": 97}
+alerter_priority = {
+    "frontal_collision": 100,
+    "stop": 98,
+    "red": 99,
+    "no-entry": 97,
+    "give-way": 96,
+    "person": 95,
+    "keep-right": 94,
+    "curve-left": 93,
+    "curve-right": 93,
+}
 
 # store last gps data
 old_gps_value: list = [0, 0, 0]
@@ -127,22 +140,3 @@ def toggle_switch_sound():
         switch_sound = False
     else:
         switch_sound = True
-
-
-def gps_update_infos(speed: int, lat: float, lon: float) -> None:
-
-    gps_lock.acquire()
-    gps_queue.put((speed, lat, lon))
-    gps_lock.release()
-
-
-def get_gps_infos() -> [int, float, float]:
-
-    global old_gps_value
-    infos = []
-
-    gps_lock.acquire()
-    infos = gps_queue.get()
-    gps_lock.release()
-
-    return infos

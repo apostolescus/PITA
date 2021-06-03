@@ -19,8 +19,8 @@ from kivy.config import Config
 from camera_manager import CameraManagerSingleton
 from storage import UISelected, StoppableThread
 from storage import toggle_update_message, last_alert_queue
-from storage import toggle_switch_sound, config_file, get_gps_infos
-from storage import alerter_dictionary, alerter_color
+from storage import toggle_switch_sound, config_file
+from storage import alerter_dictionary, alerter_color, speed_screen_queue
 
 # Queues for pipeline
 captured_image_queue = Queue(1)
@@ -44,10 +44,56 @@ class Screen_One(Screen):
     def __init__(self, **kwargs):
         super(Screen_One, self).__init__(**kwargs)
         self.capture = CameraManagerSingleton.get_instance(config_file)
+        self._last_speed: float = 0
 
-        # schedule update
+        # schedule update screen
         update_interval = int(config_file["VIDEO"]["update"])
         Clock.schedule_interval(self.update, 1.0 / update_interval)
+
+        # schedule speed update
+        Clock.schedule_interval(self._update_speed, 1)
+
+        # schedule alert checking
+        Clock.schedule_interval(self._update_alerts, 1/10)
+
+    def _update_alerts(self, dt):
+        '''Updates to screen last alert'''
+        
+        try:
+            last_alert = last_alert_queue.get_nowait()
+
+            try:
+                alert_description = alerter_dictionary[last_alert]
+            except KeyError:
+                alert_description = last_alert
+
+            self.ids.alert_label.text = alert_description
+
+            try:
+                alert_color = alerter_color[last_alert]
+            except KeyError:
+                alert_color = [252, 3, 3, 1]
+
+            self.ids.alert_label.color = alert_color
+
+        except Empty:
+            pass
+     
+    def _update_speed(self, dt):
+        
+        try:
+            speed = speed_screen_queue.get_nowait()
+            self._last_speed = speed
+
+            if speed > 120:
+                self.ids.speed.color = [33, 210, 202,1]
+                self.ids.speed.text = str(speed)
+            else:
+                self.ids.speed.color = [3, 3, 255,1]
+                self.ids.speed.text = str(speed)
+
+        except Empty:
+            return
 
     def update(self, dt):
         """ Captures image from cameraManager and puts it in pipeline"""
@@ -61,51 +107,6 @@ class Screen_One(Screen):
         except:
             pass
         
-        # fetch and display alerts
-        try:
-            last_alert = last_alert_queue.get_nowait()
-
-            # # get alert description from dictionary
-            # try:
-            #     alert_description = alerter_dictionary[last_alert]
-            # except:
-            #     alert_description = last_alert
-
-            #self.ids.alert_label.text = last_alert
-
-            # get coresponding alert color
-            # try:
-            #     alert_color = alerter_color[last_alert]
-                
-            #     # danger - red color
-            #     if alert_color == 2:
-            #         alert_color = [33, 210, 202,1]
-            #     # pay attention - yellow color
-            #     elif alert_color == 1:
-            #         alert_color = [3, 3, 255,1]
-            #     # informative detection - blue
-            #     else:
-            #         alert_color = [252, 3, 3, 1]
-            # except:
-            #     alert_color = [252, 3, 3, 1]
-            
-            # self.ids.alert_label.color = alert_color
-
-        except Empty:
-            pass
-        
-        # get speed each x seconds
-        # if time.time() - last_speed_update_time > SPEED_UPDATE_INTERVAL:
-        #     speed = get_gps_infos()[0]
-        #     last_speed_update_time = time.time()
-
-        #     if speed > 120:
-        #         self.ids.speed.color = [33, 210, 202,1]
-        #         self.ids.speed.text = str(speed)
-        #     else:
-        #         self.ids.speed.color = [3, 3, 255,1]
-        #         self.ids.speed.text = str(speed)
-
         # display processed image
         try:
             img = result_queue.get_nowait()

@@ -5,6 +5,7 @@ import io
 import base64
 from threading import Thread
 import uuid
+from queue import Empty, Full
 
 import selectors
 import json
@@ -17,8 +18,8 @@ from playsound import playsound
 # import locals
 from screen_manager import captured_image_queue, result_queue
 from storage import toggle_update_message, get_update_message, config_file
-from storage import UISelected, get_switch_sound, get_gps_infos, logger
-from storage import last_alert_queue
+from storage import UISelected, get_switch_sound, gps_queue, logger
+from storage import last_alert_queue, alerter_priority
 
 # globals
 lane_detection = False
@@ -60,6 +61,11 @@ class Message:
         #delay time to send message
         self._last_message = 0
         self._last_response = 0
+        
+        #save last gps infos
+        self._last_lat: float = 0
+        self._last_lon: float = 0
+        self._last_speed: int = 0
 
         # only for lane detection comparision
         if counter != 0:
@@ -169,19 +175,21 @@ class Message:
                 logger.debug("--- generate_request --- content len: ", len(content))
 
             # get GPS infos
-            gps_infos = get_gps_infos()
-
-            gps_speed = gps_infos[0]
-            gps_lat = gps_infos[1]
-            gps_lon = gps_infos[2]
-
+            try:
+                gps_infos = gps_queue.get_nowait()
+                self._last_speed = gps_infos[0]
+                self._last_lat = gps_infos[1]
+                self._last_lon = gps_infos[2]
+            except Empty:
+                pass
+         
             # create header dictionary
             header = {
                 "request-type": "DETECT",
                 "time": time.time(),
-                "speed": gps_speed,
-                "lat": gps_lat,
-                "lon": gps_lon,
+                "speed": self._last_speed,
+                "lat": self._last_lat,
+                "lon": self._last_lon,
                 "uuid":str(unique_id),
                 "content-len": len(content),
             }
@@ -324,9 +332,27 @@ class Message:
         try:
             alerts = response["alerts"]
             # display alerts
+            
             if alerts:
+                max_priority = 0
+                max_alert = 0
+
+                # get the most important alert
                 for alert in alerts:
-                    last_alert_queue.put(alert)
+                    try:
+                        priority = alerter_priority[alert] 
+                        if priority > max_priority:
+                            max_alert = alert
+                    except KeyError:
+                        priority = 1
+                        if priority > max_priority:
+                            max_alert = alert
+                            
+                # put in queue the most important alert
+                try:
+                    last_alert_queue.put(max_alert)
+                except Full:
+                    pass
 
         except KeyError:
             pass
