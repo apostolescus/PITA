@@ -1,9 +1,9 @@
-"""Module responsible for handling communication messages between server and client.
+"""
+Module responsible for handling communication messages between server and client.
 """
 import time
 import io
 import base64
-from threading import Thread
 import uuid
 from queue import Empty, Full
 
@@ -17,7 +17,7 @@ import cv2
 from screen_manager import captured_image_queue, result_queue
 from storage import toggle_update_message, get_update_message, config_file
 from storage import UISelected, get_switch_sound, gps_queue, logger
-from storage import last_alert_queue, alerter_priority, distance_queue
+from storage import last_alert_queue, distance_queue
 from storage import load_polygone_lines, safe_distance_queue
 from sound_manager import SoundManager
 
@@ -32,9 +32,6 @@ TIME = bool(config_file["DEBUG"].getboolean("time"))
 
 # measure total travel time
 uuid_dict = {}
-
-
-
 
 
 class Message:
@@ -54,20 +51,20 @@ class Message:
         self._average_time = 0
         self._average_time_counter = 0
 
-        #delay time to send message
+        # delay time to send message
         self._last_message = 0
         self._last_response = 0
-        
-        #save last gps infos
+
+        # save last gps infos
         self._last_lat: float = 0
         self._last_lon: float = 0
         self._last_speed: int = 0
-        
+
         # only for the first time send polygone
         self._start = True
         self._polygone_lines = []
         self._np_lines = []
-        self._DISPLAY_TRIANGLE:bool = config_file["FRAME"].getboolean("display")
+        self._DISPLAY_TRIANGLE: bool = config_file["FRAME"].getboolean("display")
 
         # manager of alert sounds
         self._sound_manager = SoundManager()
@@ -155,7 +152,7 @@ class Message:
                     "experience": UISelected.experience,
                     "record_mode": UISelected.rec_mode,
                     "reaction_time": UISelected.reaction_time,
-                    "uuid":str(unique_id),
+                    "uuid": str(unique_id),
                 }
                 UISelected.updated = False
             else:
@@ -164,7 +161,7 @@ class Message:
                     "update": 0,
                     "time": time.time(),
                     "lane": UISelected.lane_detection,
-                    "uuid":str(unique_id),
+                    "uuid": str(unique_id),
                 }
 
             # if first message send polygone lines
@@ -198,8 +195,7 @@ class Message:
                 self._last_lon = gps_infos[2]
             except Empty:
                 pass
-           
-                
+
             # create header dictionary
             header = {
                 "request-type": "DETECT",
@@ -207,7 +203,7 @@ class Message:
                 "speed": self._last_speed,
                 "lat": self._last_lat,
                 "lon": self._last_lon,
-                "uuid":str(unique_id),
+                "uuid": str(unique_id),
                 "content-len": len(content),
             }
 
@@ -299,9 +295,13 @@ class Message:
             self._average_time = self._average_time + (current_time - start_time)
             self._average_time_counter += 1
 
-            if self._average_time_counter%100 == 0:
-                logger.info("Average time in " + str(self._average_time_counter) + " messages: " + 
-                str(current_time - start_time))
+            if self._average_time_counter % 100 == 0:
+                logger.info(
+                    "Average time in "
+                    + str(self._average_time_counter)
+                    + " messages: "
+                    + str(current_time - start_time)
+                )
 
         if DEBUG:
             logger.debug("--- main_thread --- processing request")
@@ -345,7 +345,8 @@ class Message:
         obj_list = response["detected_objects"]
         danger = response["danger"]
         line = response["lines"]
-           
+
+        # displays and notify driver
         try:
             alert = response["alert"]
             if alert and alert in self._alert_list:
@@ -354,10 +355,11 @@ class Message:
                     self._sound_manager.play_sound_custom_notification(alert)
                 except Full:
                     pass
-                
+
         except KeyError:
             pass
-        
+
+        # fetch safe distance
         try:
             safe_distance = response["safe_distance"]
             try:
@@ -382,7 +384,6 @@ class Message:
 
                 color = obj["color"]
                 label = obj["label"]
-
                 score = obj["score"]
 
                 text = "{}: {}".format(label, score)
@@ -415,11 +416,10 @@ class Message:
                 self._current_image, 1, line_image, 0.5, 1
             )
 
-
         # display triangle used for lane and collision
-        # if self._DISPLAY_TRIANGLE:
-        #     pts = np.array([self._np_lines], np.int32)
-        #     cv2.polylines(self._current_image, pts, True, (0, 255, 255), 2)
+        if self._DISPLAY_TRIANGLE:
+            pts = np.array([self._np_lines], np.int32)
+            cv2.polylines(self._current_image, pts, True, (0, 255, 255), 2)
 
     def _read(self):
 
@@ -446,8 +446,7 @@ class Message:
             self._process_header()
 
         self._process_request()
-        
-        
+
     def close(self):
 
         logger.info("Closing connection ...")
