@@ -12,8 +12,6 @@ import json
 import struct
 import numpy as np
 import cv2
-import notify2
-from playsound import playsound
 
 # import locals
 from screen_manager import captured_image_queue, result_queue
@@ -21,13 +19,11 @@ from storage import toggle_update_message, get_update_message, config_file
 from storage import UISelected, get_switch_sound, gps_queue, logger
 from storage import last_alert_queue, alerter_priority, distance_queue
 from storage import load_polygone_lines, safe_distance_queue
+from sound_manager import SoundManager
 
 # globals
 lane_detection = False
 first_message = False
-
-# notification initialization
-notify2.init('PITA')
 
 # debugg
 counter = config_file["DEBUG"].getint("video_frames")
@@ -38,8 +34,7 @@ TIME = bool(config_file["DEBUG"].getboolean("time"))
 uuid_dict = {}
 
 
-def play_sound():
-    playsound("alert_sounds/beep.mp3")
+
 
 
 class Message:
@@ -73,6 +68,9 @@ class Message:
         self._polygone_lines = []
         self._np_lines = []
         self._DISPLAY_TRIANGLE:bool = config_file["FRAME"].getboolean("display")
+
+        # manager of alert sounds
+        self._sound_manager = SoundManager()
 
         # alert display only list
         self._alert_list = config_file["ALERT"]["show_alerts"].split(",")
@@ -347,15 +345,13 @@ class Message:
         obj_list = response["detected_objects"]
         danger = response["danger"]
         line = response["lines"]
-        
-        
+           
         try:
             alert = response["alert"]
-            
             if alert and alert in self._alert_list:
-                print("Alert response: ", alert)
                 try:
                     last_alert_queue.put(alert)
+                    self._sound_manager.play_sound_custom_notification(alert)
                 except Full:
                     pass
                 
@@ -364,7 +360,6 @@ class Message:
         
         try:
             safe_distance = response["safe_distance"]
-            
             try:
                 safe_distance_queue.put_nowait(safe_distance)
             except Full:
@@ -373,10 +368,9 @@ class Message:
             pass
 
         switch_sound = get_switch_sound()
+
         if danger == 1 and switch_sound:
-            
-            t = Thread(target=play_sound)
-            t.start()
+            self._sound_manager.play_sound()
 
         image = self._current_image
 
@@ -388,8 +382,10 @@ class Message:
 
                 color = obj["color"]
                 label = obj["label"]
+
                 score = obj["score"]
-                text = "{}: {:.4f}".format(label, score)
+
+                text = "{}: {}".format(label, score)
 
                 try:
                     distance = obj["distance"]
@@ -419,23 +415,11 @@ class Message:
                 self._current_image, 1, line_image, 0.5, 1
             )
 
-            # print("Lines: ", type(line))
-            # self._current_image = cv2.addWeighted(self._current_image, 1, line, 0.5, 1)
-
-        # # only for experimental/ debugging purpose
-        # if counter > 0:
-        #     self.out.write(self._current_image)
-        #     counter -= 1
-        # else:
-        #     if self.saved is False:
-        #         print("VIDEO SAVED SUCCESFULLY")
-        #         self.out.release()
-        #         self.saved = True
 
         # display triangle used for lane and collision
-        if self._DISPLAY_TRIANGLE:
-            pts = np.array([self._np_lines], np.int32)
-            cv2.polylines(self._current_image, pts, True, (0, 255, 255), 2)
+        # if self._DISPLAY_TRIANGLE:
+        #     pts = np.array([self._np_lines], np.int32)
+        #     cv2.polylines(self._current_image, pts, True, (0, 255, 255), 2)
 
     def _read(self):
 

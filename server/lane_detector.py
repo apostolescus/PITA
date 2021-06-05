@@ -12,7 +12,7 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 
-from storage import  RecordStorage, get_poly_lines
+from storage import RecordStorage, get_poly_lines
 from storage import config_file, timer, logger
 
 # for testing only
@@ -49,8 +49,10 @@ class LaneDetector:
         self.MAX_COUNTER = config_file["LANE_DETECTION"].getfloat("max_counter")
 
     def __canny(self, gray):
-        """Applies gaussian blurs over the grayed image
-        and detects edged using canny edge detector."""
+        """
+        Applies gaussian blurs over the grayed image
+        and detects edged using canny edge detector.
+        """
 
         blur = cv2.GaussianBlur(gray, (5, 5), 0)
         canny = cv2.Canny(blur, 100, 150)
@@ -63,8 +65,10 @@ class LaneDetector:
         return gray
 
     def __region_of_interest(self, image):
-        """Selects and crops a region of interest
-        for searching lines."""
+        """
+        Selects and crops a region of interest
+        for searching lines.
+        """
 
         polygons = get_poly_lines("other")
         polygons = np.array([polygons])
@@ -80,7 +84,8 @@ class LaneDetector:
         Calculates plottable points coordinates relative to the image shape.
         Calculates average lines.
 
-        Returns list (x,y) points pairs for each line."""
+        Returns list (x,y) points pairs for each line.
+        """
 
         slope, intercept = line_parameters
 
@@ -154,7 +159,7 @@ class LaneDetector:
 
             left_line = self.__make_coordinates(image, left_fit_average, "left")
             right_line = self.__make_coordinates(image, right_fit_average, "right")
-            
+
             return np.array([left_line, right_line]).astype(int)
 
         # only if left line detected
@@ -187,32 +192,22 @@ class LaneDetector:
                 return np.array([self.avg_left, right_line]).astype(int)
             else:
                 return np.array([right_line]).astype(int)
-        else:
-            if self.average_counter < self.MAX_COUNTER:
-                self.average_counter += 1
-                #print("NO line detected after slope, average counter: ", self.average_counter)
-                if self.avg_right is not None and self.avg_left is not None:
-                        return np.array([self.avg_left, self.avg_right]).astype(int)
+        
+        if self.average_counter < self.MAX_COUNTER:
+            self.average_counter += 1
+            # print("NO line detected after slope, average counter: ", self.average_counter)
+            if self.avg_right is not None and self.avg_left is not None:
+                return np.array([self.avg_left, self.avg_right]).astype(int)
 
-            return []
-
-    def __display_lines(self, image, lines):
-        line_image = np.zeros_like(image)
-
-        if lines is not None:
-            for x1, y1, x2, y2 in lines:
-                try:
-                    cv2.line(line_image, (x1, y1), (x2, y2), (0, 190, 255), 11)
-                except:
-                    return None
-        return line_image
+        return []
 
     def detect_lane(self, image):
         """
         Public method exported for lane detection.
 
         Returns a list containing left and right lane
-        points coordinates."""
+        points coordinates.
+        """
 
         lane_image = np.copy(image)
         if timer:
@@ -235,19 +230,23 @@ class LaneDetector:
 
         if timer:
             end_time = time.time()
-            print("Total time: ", end_time - start_time)
+            logger.log(
+                "LANE_DETECTOR", "Total detection time: " + str(end_time - start_time)
+            )
 
         if lines is not None:
             averaged_lines = self.__averaged_slope_intercept(lane_image, lines)
 
             if timer:
-                print("After average: ", time.time() - start_time)
+                logger.log(
+                    "LANE_DETECTOR", "After average: " + str(time.time() - start_time)
+                )
 
             return averaged_lines
         else:
             # if the average time option is aviable
             if self.average_counter < self.MAX_COUNTER:
-                #print("NO line detected, average counter: ", self.average_counter)
+                # print("NO line detected, average counter: ", self.average_counter)
                 self.average_counter += 1
                 if self.avg_right is not None and self.avg_left is not None:
                     return np.array([self.avg_left, self.avg_right]).astype(int)
@@ -303,9 +302,6 @@ def test():
 
     cap.release()
     cv2.destroyAllWindows()
-
-
-# test()
 
 
 # from lanenet_model import lanenet

@@ -9,11 +9,14 @@ from storage import get_weather_by_index, alerter_priority
 from storage import FrictionCoefficient, Constants, RecordStorage, logger
 from video_manager_wrapper import VideoManagerWrapper
 
+# don't generate alert for specific objects
 non_alert_list = ["car", "bus", "truck", "moto"]
 
 
 class Update:
-    """Class used for updates of the alert coefficients"""
+    """
+    Class used for updates of the alert coefficients.
+    """
 
     def __init__(
         self,
@@ -32,8 +35,10 @@ class Update:
 
 
 class Alerter:
-    """Class used to calculate maximum braking distance, create, upload to firebase and
-    add to user response alert if necessary"""
+    """
+    Class used to calculate maximum braking distance, create, upload to firebase and
+    add to user response alert if necessary.
+    """
 
     def __init__(
         self,
@@ -63,9 +68,11 @@ class Alerter:
         self.alert["time"] = time.time()
 
     def update(self, update):
-        """Method that updates values of the parameters used to calculate
-        the maximum braking distance."""
-        
+        """
+        Method that updates values of the parameters used to calculate
+        the maximum braking distance.
+        """
+
         if update.experience == 0:
             add_reaction_time = 1
         elif update.experience == 1:
@@ -99,8 +106,10 @@ class Alerter:
         logger.log("ALERTER", "Data succesfully updated")
 
     def check_safety(self, detection_results, gps_infos):
-        """Method that checks if the driver is at a safe distance.
-        If not returns a danger signal and client alerts the driver"""
+        """
+        Method that checks if the driver is at a safe distance.
+        If not returns a danger signal and client alerts the driver.
+        """
 
         detected_results = detection_results
 
@@ -117,7 +126,7 @@ class Alerter:
             if detected:
                 distances = detected_results.frontal_distances
 
-                detected_results.alert = ''
+                detected_results.alert = ""
 
                 # if there is any detected object that was in the ROI
                 if len(distances) >= 1:
@@ -133,26 +142,36 @@ class Alerter:
 
                             logger.log(
                                 "ALERTER",
-                                "Danger detected, more than 80% procent overlaping"
+                                "Danger detected, more than 80% procent overlaping",
                             )
 
                             detected_results.danger = 1
 
                             # uploading to firebase
-                            # x = Thread(target=self._upload_to_firebase, args=("frontal_collision", speed, time.time(), 1, lat, lon,))
-                            # x.start()
+                            x = Thread(
+                                target=self._upload_to_firebase,
+                                args=(
+                                    "frontal_collision",
+                                    speed,
+                                    time.time(),
+                                    1,
+                                    lat,
+                                    lon,
+                                ),
+                            )
+                            x.start()
 
                             if "frontal_collision" != self.alert["alert"]:
-                                    self.alert["alert"] = "frontal_collision"
-                                    self.alert["time"] = time.time()
-                                    self.alert["priority"] = 99 
-                                    detected_results.alert = 'frontal_collision'
+                                self.alert["alert"] = "frontal_collision"
+                                self.alert["time"] = time.time()
+                                self.alert["priority"] = 99
+                                detected_results.alert = "frontal_collision"
 
                             elif time.time() - self.alert["time"] > 1:
                                 self.alert["time"] = time.time()
 
                             if not RecordStorage.start_smart:
-                                logger.log("ALERTER","Smart Record Started")
+                                logger.log("ALERTER", "Smart Record Started")
                                 RecordStorage.start_smart = True
                                 self.record_delay = time.time()
                             else:
@@ -166,9 +185,8 @@ class Alerter:
 
                 for detected_object in detected_results.detected_objects:
                     if detected_object.label not in non_alert_list:
-                        
-                        # get alert priority
 
+                        # get alert priority
                         try:
                             priority = alerter_priority[detected_object.label]
                         except KeyError:
@@ -181,19 +199,22 @@ class Alerter:
                             self.alert["priority"] = priority
 
                             # upload to firebase
-                            # x = Thread(target=self._upload_to_firebase,
-                            #     args=(detected_object.label,
-                            #         speed,
-                            #         time.time(),
-                            #         0,
-                            #         lat,
-                            #         lon,
-                            #     ))
-                            # x.start()
+                            x = Thread(
+                                target=self._upload_to_firebase,
+                                args=(
+                                    detected_object.label,
+                                    speed,
+                                    time.time(),
+                                    0,
+                                    lat,
+                                    lon,
+                                ),
+                            )
+                            x.start()
 
                             # add alert to the client response
                             detected_results.alert = self.alert["alert"]
-                        
+
                         # if it's the same alert update time
                         elif priority == self.alert["priority"]:
                             self.alert["time"] = time.time()
@@ -205,28 +226,32 @@ class Alerter:
                             self.alert["priority"] = priority
 
                             # upload to firebase
-                            x = Thread(target=self._upload_to_firebase,
-                                args=(detected_object.label,
+                            x = Thread(
+                                target=self._upload_to_firebase,
+                                args=(
+                                    detected_object.label,
                                     speed,
                                     time.time(),
                                     0,
                                     lat,
                                     lon,
-                                ))
+                                ),
+                            )
                             x.start()
 
                             # add alert to the client response
                             detected_results.alert = self.alert["alert"]
 
-
         # check if it is still recording for more than 2 seconds
         if RecordStorage.start_smart and (time.time() - self.record_delay > 2):
-            logger.log("ALERTER", "Smart Record Stopped")
             RecordStorage.start_smart = False
+            logger.log("ALERTER", "Smart Record Stopped")
 
     def _calculate_max_distance(self, speed):
-        """Method that calculates maximum safe distance given a speed.
-        Speed is calculated in km/h."""
+        """
+        Method that calculates maximum safe distance given a speed.
+        Speed is calculated in km/h.
+        """
 
         braking_distance = (speed * speed) * self.multiply
         reaction_distance = speed * self.reaction_time
@@ -234,6 +259,9 @@ class Alerter:
         return braking_distance + reaction_distance
 
     def _upload_to_firebase(self, alert_type, speed, timestamp, danger, lat, lon):
+        """
+        Private method that uploads data to firebase.
+        """
 
         data = {
             "time": timestamp,
@@ -246,6 +274,8 @@ class Alerter:
 
         self.firebase_app.post("drivingInfos/", data)
         self.firebase_app.post("backup_driver_infos", data)
+
+        # save data to logger
         logger.log("ALERTER", "Data added to firebase")
 
 
@@ -253,12 +283,30 @@ def test_upload_to_firebase():
 
     import random
 
-    alerters = ["priority", "keep-right", "stop", "curve-right" ,"parking", "curve-left", "no-entry", "pedestrians", "give-way", "bike", "bus", "car", "person", "motorbike",
-    "green", "red", "red-left", "truck"]
+    alerters = [
+        "priority",
+        "keep-right",
+        "stop",
+        "curve-right",
+        "parking",
+        "curve-left",
+        "no-entry",
+        "pedestrians",
+        "give-way",
+        "bike",
+        "bus",
+        "car",
+        "person",
+        "motorbike",
+        "green",
+        "red",
+        "red-left",
+        "truck",
+    ]
 
     alerter = Alerter([(340, 1800 - 150), (920, 550), (1570, 1800 - 150)])
 
-    for i in range(0,10):
+    for i in range(0, 10):
         alert = random.choice(alerters)
         current_time = time.time()
         speed = 190
@@ -266,14 +314,3 @@ def test_upload_to_firebase():
         lat = 43.45
         lon = 46.76
         alerter._upload_to_firebase(alert, speed, current_time, danger, lat, lon)
-
-#test_upload_to_firebase()
-
-# def test():
-#     alert = Alerter()
-
-#     for i in range(34,67):
-#         d = alert._calculate_max_distance(i)
-#         print("max distance is: ", d)
-
-# test()

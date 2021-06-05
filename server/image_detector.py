@@ -1,32 +1,33 @@
 import uuid
 import time
+import typing
 
 import numpy as np
-import argparse
 import cv2
-import os, sys
 import csv
-# import pandas as pd
-# import tensorflow as tf
+
 from shapely.geometry import Polygon
-from darknet import *
+from darknet import (
+    load_network,
+    network_width,
+    network_height,
+    make_image,
+    detect_image,
+    copy_image_from_bytes,
+    free_image,
+)
 
-# os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-
-from storage import DetectedPipeline
-from storage import logger, timer, get_poly_lines
-
-# from yolov3.utils import (
-#     detect_image,
-#     detect_realtime,
-#     detect_video,
-#     Load_Yolo_model,
-#     detect_video_realtime_mp,
-# )
-# from yolov3.configs import *
+from storage import DetectedPipeline, config_file
+from storage import logger, get_poly_lines
 
 
 class DetectedObject:
+    """
+    Class that contains information about a detected object.
+    Stores information about: confidence score, bounding boxes,
+    color to display bboxes, label and unique id.
+    """
+
     def __init__(self, id, score, bbox, label, color):
         self.id = id
         self.score = score
@@ -42,22 +43,26 @@ class ImageDetector:
     In order to measure distance, you should load a file with the WIDTH of each possible object.
     The focal length of the sensor is required for correct distance measurement.
     The algoritm uses detected object width in pixels and calculates the distance base on true width
-    and focal length: https://www.pyimagesearch.com/2015/01/19/find-distance-camera-objectmarker-using-python-opencv/
+    and focal length: 
+    https://www.pyimagesearch.com/2015/01/19/find-distance-camera-objectmarker-using-python-opencv/
 
     Allows distance measurements using width or height.
     """
 
     def __init__(
         self,
-        weights,
-        config_file,
+        weights="yolo-files/yolov4.weights",
+        config_file="yolo-files",
         mode="CPU",
         labels="yolo-files/coco.names",
         data_file="yolo-files/coco.data",
         average_size="yolo-files/average_size.csv",
-        confidence=0.5,
+        confidence=0.8,
         threshold=0.3,
     ):
+        # load image sizes
+        self._image_width = 640  # config_file["DETECTION"].getint("image_width")
+        self._image_height = 480  # config_file["DETECTION"].getint("image_height")
 
         # for CPU detection
         if mode == "CPU":
@@ -80,32 +85,35 @@ class ImageDetector:
         elif mode == "GPU":
             log_text("GPU mode")
             self.mode = 1
-            self.network, self.class_names, class_colors = load_network(config_file, data_file, weights)
+            self.network, self.class_names, self.class_colors = load_network(
+                config_file, data_file, weights
+            )
+
             self.network_width = network_width(self.network)
             self.network_height = network_height(self.network)
-            
+            self._width_ratio = self._image_width / self.network_width
+            self._height_ratio = self._image_height / self.network_height
+
         self.det_time = 0
         self.pre_time = 0
         self.pro_time = 0
 
         self.labels = open(labels).read().strip().split("\n")
 
-        self._poly_lines = Polygon(get_poly_lines("poly"))
-        # start_time = time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime(time.time()))
-        # log_file_name = "{:s}_{:s}.log".format("LOG_FILE", start_time)
-        # log_file_path = os.path.join(os.getcwd(), log_file_name)
-
-        # logger.add("log.file", level="DEBUG", format="{time}{level}{message}")
+        # get polygone to check for frontal vehicles
+        self._FIX_POLY_LINES = Polygon(get_poly_lines("poly"))
 
         id_dictionary = {}
+
+        # load dictionary containing average objects sizes
         with open(average_size, "r") as data:
             for line in csv.reader(data):
                 element = line.pop(0)
-                # remove -1 after correcting numbers in csv files ( should start from 0, not from 1)
+                # remove -1 after correcting numbers in csv files (should start from 0, not from 1)
                 id_dictionary[int(element) - 1] = line
         log_text("Dictionary read!")
-        self.average_size_dictionary = id_dictionary
 
+        self.average_size_dictionary = id_dictionary
         self.confidence = confidence
         self.threshold = threshold
         self.start = time.time()
@@ -114,50 +122,64 @@ class ImageDetector:
             0, 255, size=(len(self.labels), 3), dtype="uint8"
         )
 
-
-    def _get_distances(self, mode, detected_list, height, width):
-        """ Calculates distances and checks if vehicles in front.
+    def _get_distances(
+        self, detected_list
+    ) -> typing.Tuple[typing.Dict[int, float], typing.Dict[float, int]]:
+        """
+        Calculates distances and checks if vehicles in front.
         Returns two dictionaries. One for distances having key:distance, and value:object_id
-        and another one for objects that were detected in front having key:object_id and value:0"""
-
-        # TO DO:
-        # improve for semapthore distance estimation
-        # extend range for pedestrians
+        and another one for objects that were detected in front having key:object_id and value:0
+        """
 
         distance_vector = {}
         frontal_objects = {}
 
-        # polygon used for lane detection and collision system
-        p1 = self._poly_lines
-        
         if detected_list:
             for detected_object in detected_list:
+
+                # get object sizes
                 x, y = detected_object.bbx[0], detected_object.bbx[1]
                 w, h = detected_object.bbx[2], detected_object.bbx[3]
 
-                # calculate overlap area
+                # calculate object area
                 object_area = w * h
+
+                # calculate 75% from object's area
                 object_area_min_val = 75 / 100 * object_area
-                y_cart = height - y - h
-                poli_list = [(x, y_cart), (x + w, y_cart), (x + w, y_cart + h), (x, y_cart + h)]
-                
-                p2 = Polygon(poli_list)
-                
 
-                # if the car is in front and it is over 75% inside the riding view
-                # calculate distance and add as possible danger
+                y_top = self._image_height - y - h
 
-                intersection = p2.intersects(p1)
+                # generate object points from x,y,w,h
+                detected_object_points = [
+                    (x, y_top),
+                    (x + w, y_top),
+                    (x + w, y_top + h),
+                    (x, y_top + h),
+                ]
+
+                # generate polygone from object
+                detected_object_polygone = Polygon(detected_object_points)
+
+                # check if the two polygons intersect
+                intersection = detected_object_polygone.intersects(self._FIX_POLY_LINES)
 
                 if intersection:
-                    intersection_area = p2.intersection(p1).area
+                    # calculate intersection area
+                    intersection_area = detected_object_polygone.intersection(
+                        self._FIX_POLY_LINES
+                    ).area
+
+                    # if the intersection area is bigger then 75% of object area
+                    # then the object is considered in the front of the driver
+
                     if intersection_area >= object_area_min_val:
+
+                        # calculate the distance till the object
                         distance = self._get_distance(detected_object.id, w, h)
+
+                        # add object distance to distance vector
                         distance_vector[distance] = detected_object.id
-
-                        id = detected_object.id
-                        frontal_objects[id] = 0
-
+                        frontal_objects[detected_object.id] = 0
 
         return distance_vector, frontal_objects
 
@@ -168,17 +190,12 @@ class ImageDetector:
         Returns a DetectedPipeline object.
         """
 
-        # LOAD IMAGE SHAPE FROM CONFIG/ FIRST MESSAGE
-        height = image.shape[0]
-        width = image.shape[1]
-
         detected_obj = DetectedPipeline(image)
         detected_list = self._make_prediction(image)
 
+        # if any objects were detected
         if detected_list:
-            distances, frontal_list = self._get_distances(
-                True, detected_list, height, width
-            )
+            distances, frontal_list = self._get_distances(detected_list)
             detected_obj.frontal_distances = distances
             detected_obj.frontal_objects = frontal_list
             detected_obj.detected_objects = detected_list
@@ -187,7 +204,18 @@ class ImageDetector:
         self.start = time.time()
         return detected_obj
 
-    def _extract_boxes_confidences_classids(self, outputs, width, height):
+    def _extract_boxes_confidences_classids(
+        self, outputs
+    ) -> typing.Tuple[
+        typing.List[typing.Tuple[int, int, int, int]],
+        typing.List[float],
+        typing.List[int],
+    ]:
+        """
+        Private method used fot CPU detection to filter and convert
+        detected objects bounding boxes.
+        """
+
         boxes = []
         confidences = []
         classIDs = []
@@ -202,7 +230,14 @@ class ImageDetector:
                 # Consider only the predictions that are above the confidence threshold
                 if conf > self.confidence:
                     # Scale the bounding box back to the size of the image
-                    box = detection[0:4] * np.array([width, height, width, height])
+                    box = detection[0:4] * np.array(
+                        [
+                            self._image_width,
+                            self._image_height,
+                            self._image_width,
+                            self._image_height,
+                        ]
+                    )
                     centerX, centerY, w, h = box.astype("int")
 
                     # Use the center coordinates, width and height to get the coordinates of the top left corner
@@ -215,7 +250,7 @@ class ImageDetector:
 
         return boxes, confidences, classIDs
 
-    def _make_prediction(self, image) -> [DetectedObject]:
+    def _make_prediction(self, image) -> typing.List[DetectedObject]:
         """
         Private method which passes the image through the CNN.
         Extracts class confidences and objects boxes.
@@ -224,7 +259,6 @@ class ImageDetector:
         Returns list of DetectedObjects.
         """
 
-        height, width = image.shape[:2]
         detected_objects = []
 
         # CPU detection
@@ -238,7 +272,7 @@ class ImageDetector:
 
             # Extract bounding boxes, confidences and classIDs
             boxes, confidences, classIDs = self._extract_boxes_confidences_classids(
-                outputs, width, height
+                outputs
             )
 
             # Apply Non-Max Suppression
@@ -247,7 +281,7 @@ class ImageDetector:
             if len(idxs) > 0:
                 for i in idxs.flatten():
                     label = self.labels[classIDs[i]]
-                    color = [int(c) for c in self.colors[classIDs[i]]]
+                    color = self.class_colors[label]
 
                     detected_object = DetectedObject(
                         classIDs[i], confidences[i], boxes[i], label, color
@@ -256,59 +290,68 @@ class ImageDetector:
 
         # GPU detection
         else:
-            start_time = time.time()
-            detections, width_ratio, height_ratio = self._detect_gpu(image)
-            end_time = time.time()
-
+            detections = self._detect_gpu(image)
 
             for label, conf, bboxes in detections:
                 boxes = []
 
                 class_id = int(self.labels.index(label))
-                confidence = float(conf)
+                confidence = round(float(conf), 2)
 
+                # filter confidence over certain step
                 if confidence >= self.confidence:
-                    box = bboxes * np.array([width_ratio, height_ratio, width_ratio, height_ratio])
+
+                    # convert boxes values to integer to display
+                    box = bboxes * np.array(
+                        [
+                            self._width_ratio,
+                            self._height_ratio,
+                            self._width_ratio,
+                            self._height_ratio,
+                        ]
+                    )
                     centerX, centerY, w, h = box.astype("int")
 
-                    x = int(centerX - (w/2))
-                    y = int(centerY - (h/2))
+                    x = int(centerX - (w / 2))
+                    y = int(centerY - (h / 2))
 
-                    boxes.append(x)
-                    boxes.append(y)
-                    boxes.append(int(w))
-                    boxes.append(int(h))
+                    boxes = [x, y, int(w), int(h)]
+                    # extract color
+                    color = self.class_colors[label]
 
-                    color = [int(c) for c in self.colors[class_id]]
-
+                    # generate DetectedObject
                     detected_object = DetectedObject(
                         class_id, confidence, boxes, label, color
                     )
                     detected_objects.append(detected_object)
 
-            final_end_time = time.time()
-
         return detected_objects
-    
+
     def _detect_gpu(self, image):
+        """
+        Private method used to detect objects in
+        image using GPU. Calling darknet.py methods.
+        """
 
         darknet_image = make_image(self.network_width, self.network_height, 3)
-        img_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        img_resized = cv2.resize(img_rgb, (self.network_width, self.network_height),
-                            interpolation=cv2.INTER_LINEAR)
-        
-        # get image ratios to conver bbx to proper size
 
-        image_height, image_width, _ = image.shape
-        width_ratio = image_width/self.network_width
-        height_ratio = image_height/self.network_height
+        # convert color palette of image
+        img_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+        # resize image to fit the network
+        img_resized = cv2.resize(
+            img_rgb,
+            (self.network_width, self.network_height),
+            interpolation=cv2.INTER_LINEAR,
+        )
+
+        copy_image_from_bytes(darknet_image, img_resized.tobytes())
 
         # run model on darknet style image to get detections
-        copy_image_from_bytes(darknet_image, img_resized.tobytes())
         detections = detect_image(self.network, self.class_names, darknet_image)
         free_image(darknet_image)
 
-        return detections, width_ratio, height_ratio
+        return detections
 
     def _get_distance(self, item_id, width, height, focal_length=596) -> float:
         """
@@ -317,57 +360,36 @@ class ImageDetector:
         Returns the distance in cm as float.
         """
 
+        # get object mode of distance calculation for file
         mode = int(self.average_size_dictionary[item_id][0])
+
+        # get average object size
         value = self.average_size_dictionary[item_id][1]
-        denominator = 0
 
         if mode == 0:
             denominator = height
-
         elif mode == 1:
             denominator = width
-
         elif mode == 2:
             max_val = max(width, height)
             denominator = max_val
-
         elif mode == 3:
             denominator = min(width, height)
 
+        # calculate distance
         d = focal_length * float(value) / int(denominator)
 
         return d / 100  # convert from m to cm
 
 
-
 def log_text(text):
+    """ Log text using loguru. """
     logger.log("IMAGE_DETECTOR", text)
 
 
-def test():
-
-    w = "yolo-files/yolov4-tiny.weights"
-    cfg = "yolo-files/yolov4-tiny.cfg"
-    l = "yolo-files/coco.names"
-    avg = "yolo-files/average_size.csv"
-    image = "yolo-files/test3.png"
-
-    imgDet = ImageDetector(
-        "yolo-files/yolov4-tiny.weights", "yolo-files/yolov4-tiny.cfg"
-    )
-    img = cv2.imread(image)
-
-    start = time.time()
-    dictiz = imgDet.detect(img)
-    end = time.time()
-    detected_objs = dictiz.detected_objects
-
-    print("Total obj detected: ", len(detected_objs))
-    print("Total time: ", end - start)
-
-
 def test_gpu():
-    imageDet = ImageDetector(
+    """Function for testing GPU detection."""
+    image_det = ImageDetector(
         mode="GPU",
         weights="yolo-files/yolov4-tiny.weights",
         config_file="yolo-files/yolov4-tiny.cfg",
@@ -376,7 +398,7 @@ def test_gpu():
     image = cv2.imread("images/kite.jpg")
     print("Image shape: ", image.shape)
     start_time = time.time()
-    detected = imageDet.detect(image)
+    detected = image_det.detect(image)
     end_time = time.time()
 
     for i in detected.detected_objects:
@@ -387,7 +409,3 @@ def test_gpu():
 
     print("Detected objects on GPU: ", detected)
     print("Total detected time: ", end_time - start_time)
-
-
-# test_gpu()
-#test()

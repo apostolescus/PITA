@@ -1,9 +1,8 @@
-import sys
 from threading import Thread, Event, Lock
-import copy
 import configparser
 import loguru
 
+# load configuration file
 config_file = configparser.ConfigParser()
 config_file.read("config.file")
 
@@ -26,13 +25,11 @@ height = config_file["VIDEO"].getint("height")
 
 # initialize logger
 logger = loguru.logger
-logger.add(
-    'server_log.txt', level="DEBUG", format="{time}{level}{message}"
-)
+logger.add("server_log.txt", level="DEBUG", format="{time}{level}{message}")
 
 logger.level("IMAGE_DETECTOR", no=20, color="<blue>")
 logger.level("ALERTER", no=20, color="<magenta>")
-logger.level("VIDEO", no=15,color="<green>")
+logger.level("VIDEO", no=15, color="<green>")
 logger.level("SERVER", no=16, color="<cyan>")
 logger.level("LANE_DETECTOR", no=16, color="<yellow>")
 
@@ -48,26 +45,36 @@ alerter_priority = {
     "curve-right": 93,
 }
 
-def set_poly_lines(poly, nump):
-    global poly_lines, np_lines
-    poly_lines = poly
-    np_lines = nump
 
-def get_poly_lines(name):
-    if name == "poly":
-        print("Returning Poly lines")
-        return poly_lines
-    else:
-        print("Returning np lines")
-        return np_lines
+class StoppableThread(Thread):
+    def __init__(self, name):
+        # super(StoppableThread, self).__init__(*args, **kwargs)
+        Thread.__init__(self, name=name)
+        self.stopevent = Event()
+
+    def stop(self):
+        self.stopevent.set()
+
+    def join(self):
+        print("Thread" + self.name + " is stopping")
+        self.stopevent.set()
+        Thread.join(self)
+
+
+class RecordStorage:
+    recording = False
+    mode = 0
+    start_smart = False
+
+
 class DetectedPipeline:
     def __init__(self, image):
 
         self.image = image
-        self.detected:bool = False
+        self.detected: bool = False
         self.detected_objects = None
-        self.danger:int = 0
-        self.alert:str = ''
+        self.danger: int = 0
+        self.alert: str = ""
         self.frontal_objects = None
         self.frontal_distances = None
         self.line_array = None
@@ -76,6 +83,20 @@ class DetectedPipeline:
     def get_serializable(self):
         return None
 
+class Constants:
+    km_to_h = 0.277
+    sound_duration = 1000
+    sound_freq = 440
+
+
+class UISelected:
+
+    car_type = 0  # 0 stock, 1 truck 2 bus 3 sport
+    weather = 0  # 0 dry 1 wet 2 snow 3 ice
+    experience = 0  # 0 biginner 1 intermediate 2 advanced
+    rec_mode = 0  # 0 smart mode 1 permanent 2 fix-size
+    reaction_time = 0.5
+    lane_detection = False
 
 class FrictionCoefficient:
     class standard_stock:
@@ -106,7 +127,6 @@ class FrictionCoefficient:
         multiplier = 0.003914
 
 
-
 def get_car_by_index(index):
 
     if index == 0:
@@ -115,8 +135,8 @@ def get_car_by_index(index):
         return "truck"
     elif index == 2:
         return "tourism"
-    else:
-        return "high_performance"
+    
+    return "high_performance"
 
 
 def get_weather_by_index(index):
@@ -127,8 +147,8 @@ def get_weather_by_index(index):
         return "wet_asphalt"
     elif index == 2:
         return "snow"
-    else:
-        return "ice"
+
+    return "ice"
 
 
 def get_driver_level_by_index(index):
@@ -143,22 +163,6 @@ def get_driver_level_by_index(index):
         time = 0.2
 
     return time
-
-
-class Constants:
-    km_to_h = 0.277
-    sound_duration = 1000
-    sound_freq = 440
-
-
-class UISelected:
-
-    car_type = 0  # 0 stock, 1 truck 2 bus 3 sport
-    weather = 0  # 0 dry 1 wet 2 snow 3 ice
-    experience = 0  # 0 biginner 1 intermediate 2 advanced
-    rec_mode = 0  # 0 smart mode 1 permanent 2 fix-size
-    reaction_time = 0.5
-    lane_detection = False
 
 
 def get_update_message():
@@ -176,22 +180,14 @@ def toggle_update_message():
         update_message = True
 
 
-class StoppableThread(Thread):
-    def __init__(self, name):
-        #super(StoppableThread, self).__init__(*args, **kwargs)
-        Thread.__init__(self, name=name)
-        self.stopevent = Event()
-
-    def stop(self):
-        self.stopevent.set()
-        
-    def join(self):
-        print("Thread" + self.name + " is stopping")
-        self.stopevent.set()
-        Thread.join(self)
+def set_poly_lines(poly, nump):
+    global poly_lines, np_lines
+    poly_lines = poly
+    np_lines = nump
 
 
-class RecordStorage:
-    recording = False
-    mode = 0
-    start_smart = False
+def get_poly_lines(name):
+    if name == "poly":
+        return poly_lines
+    else:
+        return np_lines

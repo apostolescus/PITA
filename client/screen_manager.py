@@ -220,14 +220,17 @@ class CameraApp(App):
 
     def on_stop(self):
         # stop all the other threads
+
+
         for thread in enumerate():
             if thread.name != "guiThread" and thread.name != "MainThread":
                 thread.join()
 
         current_system_pid = os.getpid()
-
+        print("Closing program")
         ThisSystem = psutil.Process(current_system_pid)
         ThisSystem.terminate()
+
 
     def switch_callback(self):
         global switch

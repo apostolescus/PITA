@@ -70,10 +70,7 @@ try:
                 try:
                     message.process_message(mask)
                 except Exception:
-                    logger.exception(
-                        "main: error: exception for" +
-                        str(message.addr)
-                    )
+                    logger.exception("main: error: exception for" + str(message.addr))
                     message.close()
 
 except KeyboardInterrupt:

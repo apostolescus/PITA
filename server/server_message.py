@@ -1,3 +1,8 @@
+"""
+Main component of the PITA server side application.
+Manages the communication with the client and implements
+pipeline and parallel processing of the client requests.
+"""
 import selectors
 import struct
 import io
@@ -11,11 +16,12 @@ import cv2
 import numpy as np
 
 from image_detector import ImageDetector
+from video_manager_wrapper import VideoManagerWrapper
 from alerter import Alerter, Update
 from lane_detector import LaneDetector
 from storage import StoppableThread
 from storage import logger, config_file, timer, debug_mode
-from storage import np_lines, poly_lines, set_poly_lines
+from storage import set_poly_lines
 
 lane_detection = False
 
@@ -33,7 +39,10 @@ average_time_counter = 0
 
 
 class AlertThread(StoppableThread):
-    """Wrapper for Alert Class to Stoppable Thread."""
+    """
+    Wrapper for Alert Class to Stoppable Thread.
+    """
+
     def __init__(self, name):
         super(AlertThread, self).__init__(name)
         self.alerter = Alerter()
@@ -44,22 +53,27 @@ class AlertThread(StoppableThread):
     def run(self):
         global lane_detection_queue
 
-        self.stop = False
-
         while not self.stopevent.isSet():
-            
+
+            # extract detection result from image queue
             image_id, detection_results, image = alerter_queue_image.get()
 
+            # extract lane detection from lane queue
             if lane_detection:
                 lane_id, lanes = alerter_queue_lane.get()
             else:
                 lane_id = image_id
                 lanes = []
 
+            # extract gps infos from alert queue
             alert_id, gps_infos = alerter_queue.get()
 
             if image_id == lane_id == alert_id:
+
+                # send frame to video manager
                 self.alerter.video_manager.record(image)
+
+                # check safety based on extracted informations
                 self.alerter.check_safety(detection_results, gps_infos)
 
             results_queue.put([detection_results, lanes])
@@ -68,18 +82,21 @@ class AlertThread(StoppableThread):
 
 
 class LaneDetectorThread(StoppableThread):
-    """ Stoppable Thread wrapper for Lane Detector class."""
+    """
+    Stoppable Thread wrapper for Lane Detector class.
+    """
 
     logger.log("LANE_DETECTOR", "START")
+
     def run(self):
 
         lane_detector = LaneDetector()
-    
+
         while not self.stopevent.isSet():
             try:
                 # fetch image from pipeline
                 detect_id, image = lane_detection_queue.get()
-                
+
                 if timer:
                     start_time = time.time()
 
@@ -99,12 +116,15 @@ class LaneDetectorThread(StoppableThread):
                 alerter_queue_lane.put(new_response)
             except:
                 continue
+
         logger.log("LANE_DETECTOR", "STOP")
         threading.Thread.join(self)
 
 
 class ImageObjectDetectorThread(StoppableThread):
-    """ Stoppable Thread wrapper for Image Detector class."""
+    """
+    Stoppable Thread wrapper for Image Detector class.
+    """
 
     def __init__(self, name):
         super(ImageObjectDetectorThread, self).__init__(name)
@@ -139,29 +159,22 @@ class ImageObjectDetectorThread(StoppableThread):
 
             if timer:
                 start = time.time()
-            
+
             if time.time() - self.last_detection > 0.1:
-            # perform object detection
+                # perform object detection
                 detection_results = imageDetector.detect(image)
                 self.last_result = [detect_id, detection_results, image]
                 self.last_detection = time.time()
 
                 if timer:
                     end = time.time()
-                    logger.log("IMAGE_DETECTOR", "detection time is: " + str(end - start))
-
-            # if lane_detection:
-            #     print("-- image detector --- putting in Lane Detection Queue")
-            #     lane_detection_queue.put(result)
-            # else:
-            #     # print("-- image detector --- putting in Alerter Queue")
+                    logger.log(
+                        "IMAGE_DETECTOR", "detection time is: " + str(end - start)
+                    )
 
             alerter_queue_image.put(self.last_result)
 
         threading.Thread.join(self)
-
-
-
 
 
 class Message:
@@ -184,7 +197,7 @@ class Message:
         self._waiting_images = Queue(3)
         self._detection_results = Queue(1)
 
-        # get first message 
+        # get first message
         # and poligone
         self._first_detection = True
 
@@ -195,7 +208,11 @@ class Message:
             self.write()
 
     def _set_selector_events_mask(self, mode):
-        """Set selector to listen for events: mode is 'r', 'w', or 'rw'."""
+        """
+        Set selector to listen for events.
+        Mode is 'r', 'w', or 'rw'.
+        """
+
         if mode == "r":
             if debug_mode:
                 logger.log("SERVER", "Server switched to read mode")
@@ -213,15 +230,31 @@ class Message:
         self.selector.modify(self.sock, events, data=self)
 
     def _json_decode(self, json_bytes, encoding="utf-8"):
+        """
+        Private method to decode json ansewer.
+        """
+
         tiow = io.TextIOWrapper(io.BytesIO(json_bytes), encoding=encoding, newline="")
         obj = json.load(tiow)
         tiow.close()
         return obj
 
     def _json_encode(self, stream):
+        """
+        Private method to encode json.
+        """
+
         return json.dumps(stream, ensure_ascii=False).encode()
 
-    def _read(self):
+    def _read(self) -> None:
+        """
+        Private method to read bytestream form socket.
+
+        Stream is recieved in 2048*8 chunks.
+        If the connection is interruped call video manager
+        to save the recorded video.
+        """
+
         try:
             data = self.sock.recv(2048 * 8)
         except BlockingIOError:
@@ -230,9 +263,18 @@ class Message:
             if data:
                 self._recv_buffer += data
             else:
+                # call stop method video manager
+                video_manager = VideoManagerWrapper.getInstance()
+                video_manager.stop()
                 raise RuntimeError("Peer closed.")
 
     def _get_header(self):
+        """
+        Private method that extracts header from
+        the bytestream.
+        Header length is in the first 2 bytes.
+        """
+
         header_len = 2
 
         if len(self._recv_buffer) >= header_len:
@@ -240,6 +282,11 @@ class Message:
             self._recv_buffer = self._recv_buffer[header_len:]
 
     def _process_header(self):
+        """
+        Private method that reads and decodes
+        header content.
+        """
+
         header_len = self._header_len
 
         if len(self._recv_buffer) >= header_len:
@@ -249,19 +296,28 @@ class Message:
             self._read_header = False
 
     def _process_request(self):
-
+        """
+        Process recieved bytes and split them based on
+        the message type.
+        Process first message content, load detection lines
+        and start processing threads.
+        """
         request_type = self.json_header["request-type"]
 
+        # if it's the first message
         if self._first_detection:
-            
+
+            # load lines for line/frontal detection
             np_lines = self.json_header["np-lines"]
             poly_lines = self.json_header["poly-lines"]
 
             set_poly_lines(poly_lines, np_lines)
-            self._first_detection = False
 
+            # start pipeline threads
             ImageObjectDetectorThread("image_detector").start()
             AlertThread("alerter").start()
+
+            self._first_detection = False
 
         if request_type == "DETECT":
             content_len = self.json_header["content-len"]
@@ -279,6 +335,11 @@ class Message:
             self._read_header = True
 
     def _process_results(self):
+        """
+        Generate a dictionary containing detected
+        objects infos, alerts and lines.
+        Set generated dictionary as self._result variable.
+        """
 
         detected_obj = self._results[0]
         dictionary = {}
@@ -294,15 +355,17 @@ class Message:
                 dictionary["lines"] = None
         else:
             dictionary["lines"] = None
-        
+
         if detected_obj:
             if detected_obj.detected:
 
                 formatted_list = []
                 detected_list = detected_obj.detected_objects
-                
+
                 frontal_object = detected_obj.frontal_objects
-                distance_vector = {v: k for k, v in detected_obj.frontal_distances.items()} 
+                distance_vector = {
+                    v: k for k, v in detected_obj.frontal_distances.items()
+                }
 
                 alert = detected_obj.alert
 
@@ -316,10 +379,10 @@ class Message:
                     score = obj.score
 
                     obj_id = obj.id
-                   
+
                     if obj_id in frontal_object:
                         distance = distance_vector[obj_id]
-                        obj_dictionary["distance"] = round(distance,2)
+                        obj_dictionary["distance"] = round(distance, 2)
 
                     obj_dictionary["color"] = color
                     obj_dictionary["label"] = label
@@ -333,10 +396,10 @@ class Message:
                 if alert:
                     dictionary["alert"] = alert
                 else:
-                    dictionary["alert"] = ''
+                    dictionary["alert"] = ""
 
                 if detected_obj.safe_distance != 0:
-                    dictionary["safe_distance"] = round(detected_obj.safe_distance,2)
+                    dictionary["safe_distance"] = round(detected_obj.safe_distance, 2)
             else:
                 dictionary["detected_objects"] = None
                 dictionary["danger"] = None
@@ -344,11 +407,16 @@ class Message:
             dictionary["detected_objects"] = None
             dictionary["danger"] = None
 
-            
-        
         self._results = dictionary
 
     def read(self):
+        """
+        Main method that calls the underlaying methods
+        to fetch image and gps coordinates from client and
+        send them to the pipeline.
+
+        Extracts information differently based on the message type.
+        """
         global lane_detection
 
         self._read()
@@ -445,14 +513,16 @@ class Message:
 
                 else:
                     # only lane updater was switched
-
                     lane_det = self.json_header["lane"]
 
                     if debug_mode:
                         logger.log("SERVER", "Lane detector is: " + str(lane_det))
-                        logger.log("SERVER", "Global variable lane_detection is: " + str(lane_detection))
-                    #print("Global variable lane_detection is: ", lane_detection)
-                    
+                        logger.log(
+                            "SERVER",
+                            "Global variable lane_detection is: " + str(lane_detection),
+                        )
+                    # print("Global variable lane_detection is: ", lane_detection)
+
                     if lane_det:
                         if lane_detection is False:
                             logger.log("SERVER", "Stargin lane detector")
@@ -471,6 +541,10 @@ class Message:
                 self._set_selector_events_mask("w")
 
     def _generate_request(self):
+        """
+        Private method that generates the header and
+        encapsulates the message in order to send it to the client.
+        """
 
         response = self._results
         encoded_response = b""
@@ -483,15 +557,11 @@ class Message:
                 "response-type": "DETECTED",
                 "content-len": len(encoded_response),
                 "time": time.time(),
-                "uuid":self._uuid
+                "uuid": self._uuid,
             }
         # no object was detected
         else:
-            header = {
-                "time": time.time(),
-                "response-type": "EMPTY",
-                "uuid":self._uuid
-            }
+            header = {"time": time.time(), "response-type": "EMPTY", "uuid": self._uuid}
 
         encoded_header = self._json_encode(header)
         message_hdr = struct.pack("<H", len(encoded_header))
@@ -502,6 +572,10 @@ class Message:
         self._request_done = True
 
     def _write(self):
+        """
+        Low level private method that
+        sends the bytestream to the client.
+        """
 
         if self._send_buffer:
             try:
@@ -518,6 +592,10 @@ class Message:
                 logger.log("SERVER", "No content in send buffer")
 
     def write(self):
+        """
+        High level public method that manages the writing process to the client.
+        """
+
         if debug_mode:
             logger.log("SERVER", "Writing to client")
 
@@ -530,6 +608,9 @@ class Message:
             self._set_selector_events_mask("r")
 
     def close(self):
+        """
+        Private method called when a client is unregistered from the socket list.
+        """
 
         try:
             self.selector.unregister(self.sock)
