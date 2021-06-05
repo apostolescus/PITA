@@ -3,6 +3,7 @@ from datetime import datetime
 import cv2
 from storage import config_file
 
+
 class VideoManagerSingleton:
 
     """

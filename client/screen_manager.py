@@ -1,6 +1,7 @@
 import os
+import time
 from threading import enumerate
-from queue import Queue
+from queue import Queue, Empty
 
 # other libraries
 import psutil
@@ -17,8 +18,9 @@ from kivy.config import Config
 # import local dependencies
 from camera_manager import CameraManagerSingleton
 from storage import UISelected, StoppableThread
-from storage import toggle_update_message
-from storage import toggle_switch_sound, config_file
+from storage import toggle_update_message, last_alert_queue, safe_distance_queue
+from storage import toggle_switch_sound, config_file, distance_queue
+from storage import alerter_dictionary, alerter_color, speed_screen_queue
 
 # Queues for pipeline
 captured_image_queue = Queue(1)
@@ -27,6 +29,9 @@ result_queue = Queue(1)
 # global variables
 switch = False
 
+# update_speed
+last_speed_update_time = 0
+SPEED_UPDATE_INTERVAL = config_file["GPS"].getfloat("update_interval")
 
 class Display(BoxLayout):
     def __init__(self, **kwargs):
@@ -39,14 +44,83 @@ class Screen_One(Screen):
     def __init__(self, **kwargs):
         super(Screen_One, self).__init__(**kwargs)
         self.capture = CameraManagerSingleton.get_instance(config_file)
+        self._last_speed: float = 0
 
-        # schedule update
+        # schedule update screen
         update_interval = int(config_file["VIDEO"]["update"])
         Clock.schedule_interval(self.update, 1.0 / update_interval)
 
+        # schedule speed update
+        Clock.schedule_interval(self._update_speed, 1)
+
+        # schedule alert checking
+        Clock.schedule_interval(self._update_alerts, 1/10)
+
+        #schedule distance checker
+        Clock.schedule_interval(self._update_distances, 1/2)
+
+        # safe distance updater
+        Clock.schedule_interval(self._update_safe_distance, 1)
+    
+    def _update_safe_distance(self, dt):
+
+        try:
+            safe_dist = safe_distance_queue.get_nowait()
+            self.ids.safe_dist.text = str(safe_dist) + " m"
+
+        except Empty:
+            pass
+    def _update_distances(self, dt):
+
+        try:
+            label, distance = distance_queue.get_nowait()
+            self.ids.distance.text = str(distance)
+            self.ids.obj_label.text = str(label)
+        except Empty:
+            pass
+
+    def _update_alerts(self, dt):
+        '''Updates to screen last alert'''
+
+        try:
+            last_alert = last_alert_queue.get_nowait()
+
+            try:
+                alert_description = alerter_dictionary[last_alert]
+            except KeyError:
+                alert_description = last_alert
+
+            self.ids.alert_label.text = alert_description
+
+            try:
+                alert_color = alerter_color[last_alert]
+            except KeyError:
+                alert_color = [252, 3, 3, 1]
+
+            self.ids.alert_label.color = alert_color
+
+        except Empty:
+            pass
+     
+    def _update_speed(self, dt):
+        
+        try:
+            speed = speed_screen_queue.get_nowait()
+            self._last_speed = speed
+
+            if speed > 120:
+                self.ids.speed.color = [33, 210, 202,1]
+                self.ids.speed.text = str(speed)
+            else:
+                self.ids.speed.color = [3, 3, 255,1]
+                self.ids.speed.text = str(speed)
+
+        except Empty:
+            return
+
     def update(self, dt):
         """ Captures image from cameraManager and puts it in pipeline"""
-        global captured_image_queue, result_queue
+        global captured_image_queue, result_queue, last_speed_update_time
 
         frame = self.capture.get_frame()
 
@@ -55,7 +129,7 @@ class Screen_One(Screen):
             captured_image_queue.put_nowait(frame)
         except:
             pass
-
+        
         # display processed image
         try:
             img = result_queue.get_nowait()
@@ -146,14 +220,17 @@ class CameraApp(App):
 
     def on_stop(self):
         # stop all the other threads
+
+
         for thread in enumerate():
             if thread.name != "guiThread" and thread.name != "MainThread":
                 thread.join()
 
         current_system_pid = os.getpid()
-
+        print("Closing program")
         ThisSystem = psutil.Process(current_system_pid)
         ThisSystem.terminate()
+
 
     def switch_callback(self):
         global switch

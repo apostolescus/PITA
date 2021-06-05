@@ -1,29 +1,55 @@
 from threading import Lock
-from storage import StoppableThread, gps_update_infos
+import time
 import random
+from queue import Full
+
+from storage import StoppableThread
+from storage import speed_screen_queue, gps_queue
+
 
 time_rate = 0.01
 
 
 class GPS(StoppableThread):
     def __init__(self, name):
-        self.speed: int = 90
+        self.speed: int = 30
         self.lock = Lock()
         StoppableThread.__init__(self, name=name)
 
     def increase_speed(self) -> None:
-        self.speed = self.speed + 5
+        self.speed = self.speed + 1
 
     def decrease_speed(self) -> None:
-        self.speed = self.speed - 5
+        self.speed = self.speed - 1
+
+    def update_speed(self):
+        number = random.randint(-5,4)
+        
+        self.speed += number
+
+        while self.speed <= 0:
+            number = random.randint(0,3)
+            self.speed += number
 
     def run(self) -> None:
 
         while not self.stopevent.isSet():
+            
             speed = self.get_speed()
             coordinates = self.get_coordinates()
 
-            gps_update_infos(speed, coordinates[0], coordinates[1])
+            try:
+                speed_screen_queue.put_nowait(speed)
+            except Full:
+                pass
+            # gps_update_infos(speed, coordinates[0], coordinates[1])
+            try:
+                gps_queue.put_nowait((speed, coordinates[0], coordinates[1]))
+            except Full:
+                pass
+            
+            #self.update_speed()
+            time.sleep(0.5)
             # time.sleep(time_rate)
 
     def get_coordinates(self) -> [float, float]:

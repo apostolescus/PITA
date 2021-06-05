@@ -5,26 +5,25 @@ import io
 import base64
 from threading import Thread
 import uuid
+from queue import Empty, Full
 
 import selectors
 import json
 import struct
 import numpy as np
 import cv2
-import notify2
-from playsound import playsound
 
 # import locals
 from screen_manager import captured_image_queue, result_queue
 from storage import toggle_update_message, get_update_message, config_file
-from storage import UISelected, get_switch_sound, get_gps_infos, logger
+from storage import UISelected, get_switch_sound, gps_queue, logger
+from storage import last_alert_queue, alerter_priority, distance_queue
+from storage import load_polygone_lines, safe_distance_queue
+from sound_manager import SoundManager
 
 # globals
 lane_detection = False
 first_message = False
-
-# notification initialization
-notify2.init('PITA')
 
 # debugg
 counter = config_file["DEBUG"].getint("video_frames")
@@ -34,8 +33,8 @@ TIME = bool(config_file["DEBUG"].getboolean("time"))
 # measure total travel time
 uuid_dict = {}
 
-def play_sound():
-    playsound("alert_sounds/beep.mp3")
+
+
 
 
 class Message:
@@ -55,6 +54,28 @@ class Message:
         self._average_time = 0
         self._average_time_counter = 0
 
+        #delay time to send message
+        self._last_message = 0
+        self._last_response = 0
+        
+        #save last gps infos
+        self._last_lat: float = 0
+        self._last_lon: float = 0
+        self._last_speed: int = 0
+        
+        # only for the first time send polygone
+        self._start = True
+        self._polygone_lines = []
+        self._np_lines = []
+        self._DISPLAY_TRIANGLE:bool = config_file["FRAME"].getboolean("display")
+
+        # manager of alert sounds
+        self._sound_manager = SoundManager()
+
+        # alert display only list
+        self._alert_list = config_file["ALERT"]["show_alerts"].split(",")
+        for i in self._alert_list:
+            print(i)
         # only for lane detection comparision
         if counter != 0:
             self.out = cv2.VideoWriter(
@@ -86,26 +107,17 @@ class Message:
 
         if mode == "r":
             if DEBUG:
-                logger.log(
-                    leve="DEBUG",
-                    message="---main thread--- client switched to listen mode",
-                )
+                logger.debug("---main thread--- client switched to listen mode")
             events = selectors.EVENT_READ
 
         elif mode == "w":
             if DEBUG:
-                logger.log(
-                    leve="DEBUG",
-                    message="---main thread--- client switched to write mode",
-                )
+                logger.debug("---main thread--- client switched to write mode")
             events = selectors.EVENT_WRITE
 
         elif mode == "rw":
             if DEBUG:
-                logger.log(
-                    leve="DEBUG",
-                    message="---main thread--- client switched to read/write mode",
-                )
+                logger.debug("---main thread--- client switched to read/write mode")
             events = selectors.EVENT_READ | selectors.EVENT_WRITE
 
         else:
@@ -115,7 +127,6 @@ class Message:
 
     def _generate_request(self):
         """Method that generates a request for the server."""
-
         msg: str = ""
 
         # generate and add unique id to dictionary
@@ -156,6 +167,13 @@ class Message:
                     "uuid":str(unique_id),
                 }
 
+            # if first message send polygone lines
+            if self._start:
+                self._np_lines, poly_line = load_polygone_lines()
+                header["np-lines"] = self._np_lines
+                header["poly-lines"] = poly_line
+                self._start = False
+
             # update lane detection
             lane_detection = UISelected.lane_detection
 
@@ -173,19 +191,22 @@ class Message:
                 logger.debug("--- generate_request --- content len: ", len(content))
 
             # get GPS infos
-            gps_infos = get_gps_infos()
-
-            gps_speed = gps_infos[0]
-            gps_lat = gps_infos[1]
-            gps_lon = gps_infos[2]
-
+            try:
+                gps_infos = gps_queue.get_nowait()
+                self._last_speed = gps_infos[0]
+                self._last_lat = gps_infos[1]
+                self._last_lon = gps_infos[2]
+            except Empty:
+                pass
+           
+                
             # create header dictionary
             header = {
                 "request-type": "DETECT",
                 "time": time.time(),
-                "speed": gps_speed,
-                "lat": gps_lat,
-                "lon": gps_lon,
+                "speed": self._last_speed,
+                "lat": self._last_lat,
+                "lon": self._last_lon,
                 "uuid":str(unique_id),
                 "content-len": len(content),
             }
@@ -271,7 +292,6 @@ class Message:
         json_type = self.json_header["response-type"]
         uuid = self.json_header["uuid"]
 
-
         if TIME:
 
             start_time = uuid_dict[uuid]
@@ -325,39 +345,32 @@ class Message:
         obj_list = response["detected_objects"]
         danger = response["danger"]
         line = response["lines"]
-
+           
         try:
-            alerts = response["alerts"]
-            
-            # display alerts
-            if alerts:
-                for alert in alerts:
-                    n = notify2.Notification('ALERT', alert)
-                    n.show()
-                    time.sleep(0.2)
-
+            alert = response["alert"]
+            if alert and alert in self._alert_list:
+                try:
+                    last_alert_queue.put(alert)
+                    self._sound_manager.play_sound_custom_notification(alert)
+                except Full:
+                    pass
+                
+        except KeyError:
+            pass
+        
+        try:
+            safe_distance = response["safe_distance"]
+            try:
+                safe_distance_queue.put_nowait(safe_distance)
+            except Full:
+                pass
         except KeyError:
             pass
 
         switch_sound = get_switch_sound()
+
         if danger == 1 and switch_sound:
-            
-            t = Thread(target=play_sound)
-            t.start()
-
-        height = self._current_image.shape[0]
-        width = self._current_image.shape[1]
-
-        pts = np.array(
-            [
-                [
-                    (width - 530, height - 50),
-                    (width / 2 - 15, 200),
-                    (width - 120, height - 50),
-                ]
-            ],
-            np.int32,
-        )
+            self._sound_manager.play_sound()
 
         image = self._current_image
 
@@ -369,8 +382,19 @@ class Message:
 
                 color = obj["color"]
                 label = obj["label"]
+
                 score = obj["score"]
-                text = "{}: {:.4f}".format(label, score)
+
+                text = "{}: {}".format(label, score)
+
+                try:
+                    distance = obj["distance"]
+                    try:
+                        distance_queue.put_nowait((label, distance))
+                    except Full:
+                        pass
+                except KeyError:
+                    pass
 
                 cv2.rectangle(image, (x, y), (x + w, y + h), color, 2)
                 cv2.putText(
@@ -391,21 +415,11 @@ class Message:
                 self._current_image, 1, line_image, 0.5, 1
             )
 
-            # print("Lines: ", type(line))
-            # self._current_image = cv2.addWeighted(self._current_image, 1, line, 0.5, 1)
-
-        # only for experimental/ debugging purpose
-        if counter > 0:
-            self.out.write(self._current_image)
-            counter -= 1
-        else:
-            if self.saved is False:
-                print("VIDEO SAVED SUCCESFULLY")
-                self.out.release()
-                self.saved = True
 
         # display triangle used for lane and collision
-        # cv2.polylines(self._current_image, pts, True, (0, 255, 255), 2)
+        # if self._DISPLAY_TRIANGLE:
+        #     pts = np.array([self._np_lines], np.int32)
+        #     cv2.polylines(self._current_image, pts, True, (0, 255, 255), 2)
 
     def _read(self):
 
@@ -424,6 +438,7 @@ class Message:
 
     def read(self):
         """ Main function for reading and processing a message"""
+
         self._read()
 
         if self._read_header:
@@ -431,7 +446,8 @@ class Message:
             self._process_header()
 
         self._process_request()
-
+        
+        
     def close(self):
 
         logger.info("Closing connection ...")
