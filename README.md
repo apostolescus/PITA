@@ -33,7 +33,7 @@ Python Intelligent Traffic Assistant
 - [x] send polygone with first message
 - [x] display last alert in GUI
 - [x] display speed in GUI
-- [ ] add custom sound for each alert
+- [x] add custom sound for each alert
 
 ### **Coral TPU:**
  - [x] test tflite model
@@ -88,7 +88,7 @@ lane
 - [x] show notification on GUI
 - [x] remove GUI button for update
 - [x] add extra infos to GUI
-- [ ] formatting and clean code
+- [x] formatting and clean code
 
 ### **Testing: **
 - [x] measure time using uuids
@@ -97,7 +97,7 @@ lane
 - [x] test object detector GPU/CPU + tiny/normal
 - [x] test alert system (firebase, custom notifications)
 - [x] test update system 
-- [ ] test video recording modes
+- [x] test video recording modes
 
 **Optional**:
 - [x] improve lane detection

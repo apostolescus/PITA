@@ -1,11 +1,8 @@
 """ File use for storing and sharing common variable between client classes"""
-from threading import Thread, Event, Lock
+from threading import Thread, Event
 import configparser
 from queue import Queue
 import loguru
-
-lock = Lock()
-gps_lock = Lock()
 
 # initialise queues
 gps_queue = Queue()
@@ -17,11 +14,23 @@ safe_distance_queue = Queue(1)
 switch_sound = False
 update_message = False
 
+# load configration dictionary
 config_file = configparser.ConfigParser()
 config_file.read("config.file")
 
 width = config_file["VIDEO"].getint("width")
 height = config_file["VIDEO"].getint("height")
+
+# store last gps data
+old_gps_value: list = [0, 0, 0]
+old_gps_lat: float = 0
+old_gps_lon: float = 0
+
+# initialize loguru
+logger = loguru.logger
+logger.add(
+    config_file["LOGGER"]["file"], level="DEBUG", format="{time}{level}{message}"
+)
 
 # alerter dictionary
 alerter_dictionary = {
@@ -46,6 +55,7 @@ alerter_dictionary = {
     "truck": "Truck",
 }
 
+# each alert has a different color based on it's danger
 alerter_color = {
     "frontal_collision": [33, 210, 202, 1],
     "priority": [252, 3, 3, 1],
@@ -80,12 +90,39 @@ alerter_priority = {
     "curve-right": 93,
 }
 
+
+def get_update_message():
+    return update_message
+
+
+def toggle_update_message():
+    global update_message
+
+    if update_message:
+        update_message = False
+    else:
+        update_message = True
+
+
+def get_switch_sound():
+    return switch_sound
+
+
+def toggle_switch_sound():
+    global switch_sound
+
+    if switch_sound:
+        switch_sound = False
+    else:
+        switch_sound = True
+
+
 def load_polygone_lines():
-    '''Loads points that build the detection triangle from
+    """Loads points that build the detection triangle from
     configuration files.
 
-    Returns two lists, one for lane detection(np) 
-    and other for intersection calculation(poly).'''
+    Returns two lists, one for lane detection(np)
+    and other for intersection calculation(poly)."""
 
     # if type == "poly":
     #     return  [
@@ -104,12 +141,12 @@ def load_polygone_lines():
     l2 = config_file["FRAME"]["h2"]
     l3 = config_file["FRAME"]["h3"]
 
-    l11,l12 = l1.split(",")
+    l11, l12 = l1.split(",")
     l21, l22 = l2.split(",")
     l31, l32 = l3.split(",")
 
     l1 = (width + int(l11), height + int(l12))
-    l2 = (int(width/2) + int(l21), int(l22))
+    l2 = (int(width / 2) + int(l21), int(l22))
     l3 = (width + int(l31), height + int(l32))
 
     np_val = []
@@ -118,7 +155,7 @@ def load_polygone_lines():
     np_val.append(l3)
 
     l1_poly = (width + int(l11), -int(l12))
-    l2_poly = (int(width/2) + int(l21), height - int(l22))
+    l2_poly = (int(width / 2) + int(l21), height - int(l22))
     l3_poly = (width + int(l31), -int(l32))
 
     poly_val = []
@@ -127,17 +164,6 @@ def load_polygone_lines():
     poly_val.append(l3_poly)
 
     return np_val, poly_val
-
-# store last gps data
-old_gps_value: list = [0, 0, 0]
-old_gps_lat: float = 0
-old_gps_lon: float = 0
-
-# initialize loguru
-logger = loguru.logger
-logger.add(
-    config_file["LOGGER"]["file"], level="DEBUG", format="{time}{level}{message}"
-)
 
 
 class UISelected:
@@ -167,29 +193,3 @@ class StoppableThread(Thread):
     def join(self):
         self.stopevent.set()
         Thread.join(self)
-
-
-def get_update_message():
-    return update_message
-
-
-def toggle_update_message():
-    global update_message
-
-    if update_message:
-        update_message = False
-    else:
-        update_message = True
-
-
-def get_switch_sound():
-    return switch_sound
-
-
-def toggle_switch_sound():
-    global switch_sound
-
-    if switch_sound:
-        switch_sound = False
-    else:
-        switch_sound = True

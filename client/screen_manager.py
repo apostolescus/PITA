@@ -1,5 +1,4 @@
 import os
-import time
 from threading import enumerate
 from queue import Queue, Empty
 
@@ -33,6 +32,7 @@ switch = False
 last_speed_update_time = 0
 SPEED_UPDATE_INTERVAL = config_file["GPS"].getfloat("update_interval")
 
+
 class Display(BoxLayout):
     def __init__(self, **kwargs):
         super(Display, self).__init__(**kwargs)
@@ -54,15 +54,18 @@ class Screen_One(Screen):
         Clock.schedule_interval(self._update_speed, 1)
 
         # schedule alert checking
-        Clock.schedule_interval(self._update_alerts, 1/10)
+        Clock.schedule_interval(self._update_alerts, 1 / 10)
 
-        #schedule distance checker
-        Clock.schedule_interval(self._update_distances, 1/2)
+        # schedule distance checker
+        Clock.schedule_interval(self._update_distances, 1 / 2)
 
         # safe distance updater
         Clock.schedule_interval(self._update_safe_distance, 1)
-    
+
     def _update_safe_distance(self, dt):
+        """
+        Private method to update safe distance in GUI.
+        """
 
         try:
             safe_dist = safe_distance_queue.get_nowait()
@@ -70,7 +73,12 @@ class Screen_One(Screen):
 
         except Empty:
             pass
+
     def _update_distances(self, dt):
+        """
+        Private method to update distance to detected object in
+        GUI.
+        """
 
         try:
             label, distance = distance_queue.get_nowait()
@@ -80,7 +88,9 @@ class Screen_One(Screen):
             pass
 
     def _update_alerts(self, dt):
-        '''Updates to screen last alert'''
+        """
+        Private method to update alert in GUI.
+        """
 
         try:
             last_alert = last_alert_queue.get_nowait()
@@ -101,25 +111,31 @@ class Screen_One(Screen):
 
         except Empty:
             pass
-     
+
     def _update_speed(self, dt):
-        
+        """
+        Private method to update speed in GUI
+        """
+
         try:
             speed = speed_screen_queue.get_nowait()
             self._last_speed = speed
 
             if speed > 120:
-                self.ids.speed.color = [33, 210, 202,1]
+                self.ids.speed.color = [33, 210, 202, 1]
                 self.ids.speed.text = str(speed)
             else:
-                self.ids.speed.color = [3, 3, 255,1]
+                self.ids.speed.color = [3, 3, 255, 1]
                 self.ids.speed.text = str(speed)
 
         except Empty:
             return
 
     def update(self, dt):
-        """ Captures image from cameraManager and puts it in pipeline"""
+        """
+        Captures image from cameraManager and puts it in pipeline.
+        """
+
         global captured_image_queue, result_queue, last_speed_update_time
 
         frame = self.capture.get_frame()
@@ -129,7 +145,7 @@ class Screen_One(Screen):
             captured_image_queue.put_nowait(frame)
         except:
             pass
-        
+
         # display processed image
         try:
             img = result_queue.get_nowait()
@@ -219,18 +235,20 @@ class CameraApp(App):
         return Display()
 
     def on_stop(self):
-        # stop all the other threads
-
+        '''
+        Method called on exit.
+        
+        Calls video manager to stop the recording.
+        '''
 
         for thread in enumerate():
             if thread.name != "guiThread" and thread.name != "MainThread":
                 thread.join()
 
         current_system_pid = os.getpid()
-        print("Closing program")
+
         ThisSystem = psutil.Process(current_system_pid)
         ThisSystem.terminate()
-
 
     def switch_callback(self):
         global switch
@@ -254,9 +272,10 @@ class CameraApp(App):
 
 
 class GUIManagerThread(StoppableThread):
+
     def run(self):
-        Config.set('graphics', 'fullscreen', 'auto')
-        Config.set('graphics', 'window_state', 'maximized')
+        Config.set("graphics", "fullscreen", "auto")
+        Config.set("graphics", "window_state", "maximized")
         Config.write()
         gui = CameraApp()
         gui.run()
