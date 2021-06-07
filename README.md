@@ -48,8 +48,8 @@ Python Intelligent Traffic Assistant
 
 ### **GPS:**
 * [x] mocking module
-* [ ] calculate speed
-* [ ] connect gps module
+* [x] calculate speed
+* [x] connect gps module
 
 ### **Camera:**
 - [x] test with webCam
@@ -66,7 +66,8 @@ Python Intelligent Traffic Assistant
 - [x] add detection for TF lite
 - [x] label other images
 - [x] perform detection on GPU
-- [ ] train network
+- [x] train network
+- [ ] improve network performances
 
 ### **Alerter:**
 - [x] alert only for vehicles on the same 
@@ -98,6 +99,7 @@ lane
 - [x] test alert system (firebase, custom notifications)
 - [x] test update system 
 - [x] test video recording modes
+- [ ] test on raspberry
 
 **Optional**:
 - [x] improve lane detection
