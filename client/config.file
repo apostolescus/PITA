@@ -31,7 +31,10 @@ client_key = client_certificates/client.key
 hostname = pita
 
 [GPS]
-update_interval = 2
+mocking = False
+fix_speed = 30
+fix_lat = 46.56
+fix_lon = 24.56
 
 [ALERT]
 show_alerts = frontal_collision,priority,keep-right,stop,curve-right,parking,curve-left,no-entry,pedestrians,give-way,bike,bus,car,person,motorbike,green,red,red-left,truck
