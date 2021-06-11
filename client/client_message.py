@@ -4,6 +4,7 @@ Module responsible for handling communication messages between server and client
 import time
 import io
 import base64
+import sys
 import uuid
 from queue import Empty, Full
 
@@ -23,7 +24,6 @@ from sound_manager import SoundManager
 
 # globals
 lane_detection = False
-first_message = False
 
 # debugg
 counter = config_file["DEBUG"].getint("video_frames")
@@ -71,8 +71,7 @@ class Message:
 
         # alert display only list
         self._alert_list = config_file["ALERT"]["show_alerts"].split(",")
-        for i in self._alert_list:
-            print(i)
+        
         # only for lane detection comparision
         if counter != 0:
             self.out = cv2.VideoWriter(
@@ -169,6 +168,8 @@ class Message:
                 self._np_lines, poly_line = load_polygone_lines()
                 header["np-lines"] = self._np_lines
                 header["poly-lines"] = poly_line
+                header["user-uid"] = config_file["DATABASE"]["uid"]
+                print("Header: ", header)
                 self._start = False
 
             # update lane detection
@@ -190,9 +191,19 @@ class Message:
             # get GPS infos
             try:
                 gps_infos = gps_queue.get_nowait()
-                self._last_speed = gps_infos[0]
-                self._last_lat = gps_infos[1]
-                self._last_lon = gps_infos[2]
+                speed = gps_infos[0]
+                lat = gps_infos[1]
+                lon = gps_infos[2]
+
+                if speed != 0:
+                    self._last_speed = speed
+                
+                if lon != 0:
+                    self._last_lon = lon
+                
+                if lat != 0:
+                    self._last_lat = lat
+
             except Empty:
                 pass
 

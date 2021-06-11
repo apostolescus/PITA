@@ -43,9 +43,9 @@ class AlertThread(StoppableThread):
     Wrapper for Alert Class to Stoppable Thread.
     """
 
-    def __init__(self, name):
+    def __init__(self, name, client_uid):
         super(AlertThread, self).__init__(name)
-        self.alerter = Alerter()
+        self.alerter = Alerter(client_uid)
 
     def update(self, update):
         self.alerter.update(update)
@@ -310,12 +310,13 @@ class Message:
             # load lines for line/frontal detection
             np_lines = self.json_header["np-lines"]
             poly_lines = self.json_header["poly-lines"]
+            client_uid = self.json_header["user-uid"]
 
             set_poly_lines(poly_lines, np_lines)
 
             # start pipeline threads
             ImageObjectDetectorThread("image_detector").start()
-            AlertThread("alerter").start()
+            AlertThread("alerter", client_uid).start()
 
             self._first_detection = False
 

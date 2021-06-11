@@ -3,6 +3,9 @@
 import time
 from threading import Thread
 from firebase import firebase
+import firebase_admin
+from firebase_admin import credentials
+from firebase_admin import db
 
 from storage import get_car_by_index
 from storage import get_weather_by_index, alerter_priority
@@ -42,6 +45,7 @@ class Alerter:
 
     def __init__(
         self,
+        client_uid,
         car_type="standard_stock",
         weather_type="dry_asphalt",
         reaction_time=1,
@@ -59,13 +63,25 @@ class Alerter:
         self.started = False
         self.update_obj = None
         self.last_detected = None
-        self.firebase_app = firebase.FirebaseApplication(
-            "https://pita-13817-default-rtdb.europe-west1.firebasedatabase.app/", None
-        )
-
+       
+        self._client_uid = client_uid
         self.alert["alert"] = "none"
         self.alert["priority"] = 0
         self.alert["time"] = time.time()
+
+        # load firebase admin credentials and initialize application
+        cred = credentials.Certificate("./pita-13817-firebase-adminsdk-z75j0-29674c9af0.json")
+        firebase_admin.initialize_app(cred,{
+            'databaseURL':'https://pita-13817-default-rtdb.europe-west1.firebasedatabase.app/'
+            })
+
+        self._client_db = db.reference("users/" + self._client_uid)
+        self._backup_db = db.reference("backup/users/" + self._client_uid)
+
+        # if "13817" not in firebase_admin._apps:
+        #     firebase_admin.initialize_app(cred,{
+        #     'databaseURL':'https://pita-13817-default-rtdb.europe-west1.firebasedatabase.app/'
+        #     })
 
     def update(self, update):
         """
@@ -74,9 +90,9 @@ class Alerter:
         """
 
         if update.experience == 0:
-            add_reaction_time = 1
+            add_reaction_time = 1.2
         elif update.experience == 1:
-            add_reaction_time = 0.5
+            add_reaction_time = 0.7
         else:
             add_reaction_time = 0.3
 
@@ -147,9 +163,9 @@ class Alerter:
 
                             detected_results.danger = 1
 
-                            # uploading to firebase
+                            #uploading to firebase
                             x = Thread(
-                                target=self._upload_to_firebase,
+                                target=self._new_upload_to_firebase,
                                 args=(
                                     "frontal_collision",
                                     speed,
@@ -198,9 +214,9 @@ class Alerter:
                             self.alert["time"] = time.time()
                             self.alert["priority"] = priority
 
-                            # upload to firebase
+                            #upload to firebase
                             x = Thread(
-                                target=self._upload_to_firebase,
+                                target=self._new_upload_to_firebase,
                                 args=(
                                     detected_object.label,
                                     speed,
@@ -225,9 +241,9 @@ class Alerter:
                             self.alert["time"] = time.time()
                             self.alert["priority"] = priority
 
-                            # upload to firebase
+                            #upload to firebase
                             x = Thread(
-                                target=self._upload_to_firebase,
+                                target=self._new_upload_to_firebase,
                                 args=(
                                     detected_object.label,
                                     speed,
@@ -257,11 +273,8 @@ class Alerter:
         reaction_distance = speed * self.reaction_time
 
         return braking_distance + reaction_distance
-
-    def _upload_to_firebase(self, alert_type, speed, timestamp, danger, lat, lon):
-        """
-        Private method that uploads data to firebase.
-        """
+    
+    def _new_upload_to_firebase(self, alert_type, speed, timestamp, danger, lat, lon):
 
         data = {
             "time": timestamp,
@@ -272,11 +285,9 @@ class Alerter:
             "lon": lon,
         }
 
-        self.firebase_app.post("drivingInfos/", data)
-        self.firebase_app.post("backup_driver_infos", data)
+        self._client_db.push(data)
+        self._backup_db.push(data)
 
-        # save data to logger
-        logger.log("ALERTER", "Data added to firebase")
 
 
 def test_upload_to_firebase():
@@ -304,7 +315,7 @@ def test_upload_to_firebase():
         "truck",
     ]
 
-    alerter = Alerter([(340, 1800 - 150), (920, 550), (1570, 1800 - 150)])
+    alerter = Alerter("q3MyVhuNnZR7c7zaqJk73UM980J2")
 
     for i in range(0, 10):
         alert = random.choice(alerters)
@@ -313,4 +324,6 @@ def test_upload_to_firebase():
         danger = 0
         lat = 43.45
         lon = 46.76
-        alerter._upload_to_firebase(alert, speed, current_time, danger, lat, lon)
+        alerter._new_upload_to_firebase(alert, speed, current_time, danger, lat, lon)
+
+#test_upload_to_firebase()

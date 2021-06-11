@@ -59,7 +59,7 @@ Python Intelligent Traffic Assistant
 - [x] smart recording mode
 - [x] start smart recording by default
 - [x] connect GPIO Camera
-- [ ] connect external screen
+- [x] connect external screen
 
 ### **Network:**
 - [x] implement both tf and yolo detection
@@ -82,6 +82,7 @@ lane
 - [x] create GUI
 - [x] fetch data from firebase
 - [x] display alerts on mobile
+- [x] add login for firebase authorisation
 
 ### **Other:**
 - [x] add logguru
@@ -99,7 +100,8 @@ lane
 - [x] test alert system (firebase, custom notifications)
 - [x] test update system 
 - [x] test video recording modes
-- [ ] test on raspberry
+- [x] test on raspberry
+- [x] secure Firebase access
 
 **Optional**:
 - [x] improve lane detection
